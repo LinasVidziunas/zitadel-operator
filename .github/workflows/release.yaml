@@ -1,47 +1,46 @@
-# Tag-triggered release — the shared implementation.
-#
-# The hand-rolled copy this replaces was one of NINE near-identical
-# workflows across the public estate, and the shared one had sat in
-# ci-workflows with ZERO callers. That is not a cosmetic gap: bar's
-# release workflows drifted out of sync with the tool they invoked and
-# nobody noticed for weeks, because release machinery is exercised only
-# by a tag. gemaal adopted this first and found a real bug in the
-# shared workflow within two minutes (a permissions ceiling that
-# dropped packages:write), fixed in ci-workflows v2.7.0 and proven by
-# gemaal v0.13.7.
-#
-# The caller grants the permissions because a reusable workflow can
-# narrow them but never widen them. That same rule is why the private
-# (ECR) half is a separate workflow rather than a flag on this one.
 name: Release
-
 on:
   push:
-    tags:
-      - "v*"
-
+    tags: ["v*"]
 permissions:
   contents: write
   packages: write
-
-# Never cancel a running publish — a half-pushed artifact set is worse
-# than a queued wait.
 concurrency:
   group: release-${{ github.ref }}
   cancel-in-progress: false
-
 jobs:
   release:
-    permissions:
-      contents: write
-      packages: write
-    uses: truvity/ci-workflows/.github/workflows/release-public.yaml@eb317bdb3240d43404665cc943d1c00e8946f733 # v2.18.0
-    with:
-      charts: '["zitadel-operator", "zitadel-operator-crds"]'
-      # The image path the CHARTS have always referenced. Without this,
-      # release-public's default (ghcr.io/truvity) sent v0.19.5's image
-      # to ghcr.io/truvity/operator while every chart pulled
-      # .../zitadel-operator/operator — the operator Applications sat in
-      # ImagePullBackOff fleet-wide on the first tag through the shared
-      # workflow. Release machinery can only be tested by a real tag.
-      ko-docker-repo: ghcr.io/truvity/zitadel-operator
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - uses: azure/setup-helm@v4
+        with:
+          version: v3.17.3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - run: go test ./...
+      - uses: goreleaser/goreleaser-action@v6
+        with:
+          version: v2.17.1
+          args: release --clean
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Publish charts
+        env:
+          TAG: ${{ github.ref_name }}
+          REGISTRY_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          printf '%s' "$REGISTRY_TOKEN" | helm registry login ghcr.io --username "$GITHUB_ACTOR" --password-stdin
+          version="${TAG#v}"
+          for chart in zitadel-operator zitadel-operator-crds; do
+            helm package "charts/$chart" --version "$version" --app-version "$version" --destination dist
+            helm push "dist/$chart-$version.tgz" oci://ghcr.io/linasvidziunas/charts
+          done

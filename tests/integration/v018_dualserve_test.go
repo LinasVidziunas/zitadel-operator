@@ -53,11 +53,12 @@ func TestDualServe_InstancePin_ForeignInstanceIgnored(t *testing.T) {
 	app := &zitadelv1alpha2.OIDCApp{
 		ObjectMeta: metav1.ObjectMeta{Name: fmt.Sprintf("v018-pinapp-%d", ts), Namespace: nsName},
 		Spec: zitadelv1alpha2.OIDCAppSpec{
-			Instance:     "some-other-instance.zitadel.example", // not ours
-			Type:         "confidential",
-			AuthMethod:   "basic",
-			RedirectUris: []string{"https://v018.example.com/callback"},
-			SecretRef:    zitadelv1alpha2.SecretRefSpec{Name: fmt.Sprintf("v018-pinsecret-%d", ts)},
+			DeletionPolicy: "Delete",
+			Instance:       "some-other-instance.zitadel.example", // not ours
+			Type:           "confidential",
+			AuthMethod:     "basic",
+			RedirectUris:   []string{"https://v018.example.com/callback"},
+			SecretRef:      zitadelv1alpha2.SecretRefSpec{Name: fmt.Sprintf("v018-pinsecret-%d", ts)},
 		},
 	}
 	if err := k8sClient.Create(ctx, app); err != nil {
@@ -109,7 +110,7 @@ func TestDualServe_AmbiguousInstance_TwoManagers(t *testing.T) {
 
 	proj := &zitadelv1alpha2.Project{
 		ObjectMeta: metav1.ObjectMeta{Name: projName, Namespace: "default"},
-		Spec:       zitadelv1alpha2.ProjectSpec{OrganizationId: testOrgID},
+		Spec:       zitadelv1alpha2.ProjectSpec{OrganizationId: testOrgID, DeletionPolicy: "Delete"},
 	}
 	if err := k8sClient.Create(ctx, proj); err != nil {
 		t.Fatalf("creating Project: %v", err)
@@ -119,11 +120,12 @@ func TestDualServe_AmbiguousInstance_TwoManagers(t *testing.T) {
 	app := &zitadelv1alpha2.OIDCApp{
 		ObjectMeta: metav1.ObjectMeta{Name: appName, Namespace: "default"},
 		Spec: zitadelv1alpha2.OIDCAppSpec{
-			ProjectRef:   &zitadelv1alpha2.ResourceRef{Name: projName},
-			Type:         "confidential",
-			AuthMethod:   "basic",
-			RedirectUris: []string{"https://v018-amb.example.com/cb"},
-			SecretRef:    zitadelv1alpha2.SecretRefSpec{Name: fmt.Sprintf("v018-amb-secret-%d", ts)},
+			DeletionPolicy: "Delete",
+			ProjectRef:     &zitadelv1alpha2.ResourceRef{Name: projName},
+			Type:           "confidential",
+			AuthMethod:     "basic",
+			RedirectUris:   []string{"https://v018-amb.example.com/cb"},
+			SecretRef:      zitadelv1alpha2.SecretRefSpec{Name: fmt.Sprintf("v018-amb-secret-%d", ts)},
 		},
 	}
 	if err := k8sClient.Create(ctx, app); err != nil {

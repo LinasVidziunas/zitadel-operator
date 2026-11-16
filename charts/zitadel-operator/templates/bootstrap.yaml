@@ -1,0 +1,172 @@
+{{- if .Values.bootstrap.enabled }}
+{{- if ne .Values.config.binding "iam-owner" }}
+{{- fail "bootstrap requires config.binding=iam-owner" }}
+{{- end }}
+{{- $name := printf "%s-bootstrap" (include "zitadel-operator.fullname" . | trunc 53 | trimSuffix "-") }}
+{{- $keys := .Values.bootstrap.keysSecret | default (printf "%s-keys" $name) }}
+{{- $public := .Values.bootstrap.publicConfigMap | default (printf "%s-public" $name) }}
+{{- if .Values.bootstrap.generateKeys }}
+{{- if or .Values.bootstrap.systemKeySecret .Values.bootstrap.machineKeySecret }}
+{{- fail "supplied key Secrets require bootstrap.generateKeys=false" }}
+{{- end }}
+{{- if eq $keys .Values.credentials.secretName }}
+{{- fail "bootstrap.keysSecret must differ from credentials.secretName" }}
+{{- end }}
+{{- end }}
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ $name }}
+  namespace: {{ .Release.Namespace }}
+  annotations:
+    helm.sh/hook: pre-install,pre-upgrade
+    helm.sh/hook-weight: "-5"
+    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ $name }}
+  namespace: {{ .Release.Namespace }}
+  annotations:
+    helm.sh/hook: pre-install,pre-upgrade
+    helm.sh/hook-weight: "-5"
+    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+rules:
+  - apiGroups: [""]
+    resources: [secrets]
+    resourceNames:
+      - {{ .Values.credentials.secretName | quote }}
+      {{- if .Values.bootstrap.generateKeys }}
+      - {{ $keys | quote }}
+      {{- end }}
+    verbs: [get]
+  - apiGroups: [""]
+    resources: [secrets]
+    verbs: [create]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ $name }}
+  namespace: {{ .Release.Namespace }}
+  annotations:
+    helm.sh/hook: pre-install,pre-upgrade
+    helm.sh/hook-weight: "-4"
+    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ $name }}
+subjects:
+  - kind: ServiceAccount
+    name: {{ $name }}
+    namespace: {{ .Release.Namespace }}
+{{- if .Values.bootstrap.generateKeys }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ $name }}-public
+  namespace: {{ required "bootstrap.zitadelNamespace required for generated keys" .Values.bootstrap.zitadelNamespace }}
+  annotations:
+    helm.sh/hook: pre-install,pre-upgrade
+    helm.sh/hook-weight: "-5"
+    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+rules:
+  - apiGroups: [""]
+    resources: [configmaps]
+    resourceNames: [{{ $public | quote }}]
+    verbs: [get, update]
+  - apiGroups: [""]
+    resources: [configmaps]
+    verbs: [create]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ $name }}-public
+  namespace: {{ .Values.bootstrap.zitadelNamespace }}
+  annotations:
+    helm.sh/hook: pre-install,pre-upgrade
+    helm.sh/hook-weight: "-4"
+    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ $name }}-public
+subjects:
+  - kind: ServiceAccount
+    name: {{ $name }}
+    namespace: {{ .Release.Namespace }}
+{{- end }}
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ $name }}
+  namespace: {{ .Release.Namespace }}
+  annotations:
+    helm.sh/hook: pre-install,pre-upgrade
+    helm.sh/hook-weight: "-1"
+    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+spec:
+  backoffLimit: 3
+  activeDeadlineSeconds: {{ add .Values.bootstrap.timeoutSeconds 60 }}
+  template:
+    spec:
+      serviceAccountName: {{ $name }}
+      restartPolicy: Never
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        fsGroup: 65532
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: bootstrap
+          image: "{{ .Values.bootstrap.image }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          args:
+            - --issuer={{ required "bootstrap.issuer required" .Values.bootstrap.issuer }}
+            - --system-user={{ .Values.bootstrap.systemUser }}
+            - --username={{ .Values.bootstrap.username }}
+            - --namespace={{ .Release.Namespace }}
+            - --secret={{ .Values.credentials.secretName }}
+            - --output-key={{ .Values.credentials.key }}
+            - --timeout={{ .Values.bootstrap.timeoutSeconds }}s
+            {{- if .Values.bootstrap.expires }}
+            - --expires={{ .Values.bootstrap.expires }}
+            {{- end }}
+            - --generate-keys={{ .Values.bootstrap.generateKeys }}
+            {{- if .Values.bootstrap.generateKeys }}
+            - --keys-secret={{ $keys }}
+            - --public-namespace={{ .Values.bootstrap.zitadelNamespace }}
+            - --public-configmap={{ $public }}
+            {{- else }}
+            - --system-key=/keys/system/key.pem
+            - --machine-key=/keys/machine/key.pem
+            {{- end }}
+          securityContext:
+            readOnlyRootFilesystem: true
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: [ALL]
+          resources:
+            requests: {cpu: 25m, memory: 32Mi}
+            limits: {cpu: 250m, memory: 128Mi}
+          {{- if not .Values.bootstrap.generateKeys }}
+          volumeMounts:
+            - {name: system-key, mountPath: /keys/system, readOnly: true}
+            - {name: machine-key, mountPath: /keys/machine, readOnly: true}
+      volumes:
+        - name: system-key
+          secret:
+            secretName: {{ required "bootstrap.systemKeySecret required" .Values.bootstrap.systemKeySecret }}
+            defaultMode: 0440
+        - name: machine-key
+          secret:
+            secretName: {{ required "bootstrap.machineKeySecret required" .Values.bootstrap.machineKeySecret }}
+            defaultMode: 0440
+          {{- end }}
+{{- end }}

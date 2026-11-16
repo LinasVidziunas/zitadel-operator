@@ -104,8 +104,8 @@ Sensitive **inputs** (IdP client secrets, SMTP passwords) are never spec literal
 
 ### Lifecycle: finalizers, adoption, drift
 
-- Every managed CR gets the `zitadel.truvity.io/finalizer`; deletion removes the Zitadel resource first (blocking — the finalizer stays until cleanup succeeds), then the CR. Removing the finalizer manually orphans the Zitadel resource deliberately.
-- **Adoption**: if a matching resource already exists in Zitadel (same name under the same parent), the operator adopts it instead of duplicating; confidential apps regenerate their client secret exactly once when the output Secret lacks one.
+- Managed resources use `zitadel.truvity.io/finalizer`; cleanup failures retain it for retry. Project and OIDCApp default to remote retention; opt into cleanup with `spec.deletionPolicy: Delete`. See [fork lifecycle rules](../install/fork.md#retention-and-deletion) for other resources and singleton policies.
+- **Adoption**: OIDC clients require explicit `spec.rotateSecret` to recover a missing confidential credential. OIDC output Secrets require controller ownership. APIApp retains its upstream automatic secret recovery behavior.
 - **Drift detection**: the operator is the single writer inside its managed scope. All mutable fields are compared on every reconcile (period: 5 minutes); out-of-band edits are reverted. No drift = no API write (idempotent reconcile).
 
 Status semantics, conditions, and the SSA write discipline are specified in [Status & SSA](status-and-ssa.md).

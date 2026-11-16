@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"reflect"
+	"slices"
 
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -22,6 +23,7 @@ import (
 	"github.com/truvity/zitadel-operator/internal/zitadel"
 
 	applicationv2 "github.com/zitadel/zitadel-go/v3/pkg/client/zitadel/application/v2"
+	filterv2 "github.com/zitadel/zitadel-go/v3/pkg/client/zitadel/filter/v2"
 )
 
 // OIDCAppReconciler reconciles an OIDCApp object.
@@ -56,6 +58,25 @@ func (r *OIDCAppReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	if rsDone {
 		return rsResult, rsErr
 	}
+	if !cr.DeletionTimestamp.IsZero() && cr.Spec.DeletionPolicy != "Delete" {
+		_, result, err := handleDeletionStrict(ctx, r.Client, &cr, nil)
+		return result, err
+	}
+	if !cr.DeletionTimestamp.IsZero() {
+		_, result, err := handleDeletionStrict(ctx, r.Client, &cr, func() error {
+			if cr.Status.ApplicationId == "" {
+				return nil
+			}
+			_, err := zclient(ctx, r.Zitadel).Application().DeleteApplication(ctx, &applicationv2.DeleteApplicationRequest{
+				ApplicationId: cr.Status.ApplicationId, ProjectId: cr.Status.ProjectId,
+			})
+			if status.Code(err) == codes.NotFound {
+				return nil
+			}
+			return err
+		})
+		return result, err
+	}
 
 	// Resolve project ID (and inherited org ID).
 	projectID, inheritedOrgID, err := resolveScopedProjectId(ctx, r.Client, rs, cr.Spec.ProjectRef, cr.Spec.ProjectId, cr.Namespace, cr.Status.ProjectId, cr.Status.OrganizationId)
@@ -64,22 +85,6 @@ func (r *OIDCAppReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 			return result, nil
 		}
 		return ctrl.Result{}, fmt.Errorf("resolving project: %w", err)
-	}
-
-	// Handle deletion.
-	if done, result, err := handleDeletionStrict(ctx, r.Client, &cr, func() error {
-		if cr.Status.ApplicationId != "" {
-			_, err := zclient(ctx, r.Zitadel).Application().DeleteApplication(ctx, &applicationv2.DeleteApplicationRequest{
-				ApplicationId: cr.Status.ApplicationId,
-				ProjectId:     projectID,
-			})
-			if err != nil && status.Code(err) != codes.NotFound {
-				return fmt.Errorf("deleting application: %w", err)
-			}
-		}
-		return nil
-	}); done {
-		return result, err
 	}
 
 	// Add finalizer if not present.
@@ -111,54 +116,108 @@ func (r *OIDCAppReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 }
 
 func (r *OIDCAppReconciler) ensureCredentialSecret(ctx context.Context, cr *zitadelv1alpha2.OIDCApp, clientID, clientSecret string) error {
-	if cr.Spec.Type == "confidential" && clientSecret != "" {
+	if clientID == "" {
+		return fmt.Errorf("OIDC application returned no client ID")
+	}
+	_, authMethod := zitadelAppType(cr.Spec.Type, cr.Spec.AuthMethod)
+	if clientSecret != "" && authMethod != applicationv2.OIDCAuthMethodType_OIDC_AUTH_METHOD_TYPE_NONE {
 		return r.ensureSecret(ctx, cr, clientID, clientSecret)
 	}
-	if cr.Spec.Type == "confidential" && clientID != "" {
-		return r.ensureSecretClientID(ctx, cr, clientID)
-	}
-	return nil
+	return r.ensureSecretClientID(ctx, cr, clientID)
 }
 
 func (r *OIDCAppReconciler) updateStatusIfNeeded(ctx context.Context, cr *zitadelv1alpha2.OIDCApp, appID, clientID, projectID, inheritedOrgID string) error {
-	statusChanged := cr.Status.ApplicationId != appID || cr.Status.ClientId != clientID ||
+	rotatedFor := cr.Status.RotatedFor
+	_, authMethod := zitadelAppType(cr.Spec.Type, cr.Spec.AuthMethod)
+	if authMethod != applicationv2.OIDCAuthMethodType_OIDC_AUTH_METHOD_TYPE_NONE && cr.Spec.RotateSecret != "" {
+		rotatedFor = cr.Spec.RotateSecret
+	}
+	statusChanged := cr.Status.RotatedFor != rotatedFor || cr.Status.ApplicationId != appID || cr.Status.ClientId != clientID ||
 		cr.Status.ProjectId != projectID || cr.Status.OrganizationId != inheritedOrgID
 	cr.Status.ApplicationId = appID
 	cr.Status.ClientId = clientID
 	cr.Status.ProjectId = projectID
 	cr.Status.OrganizationId = inheritedOrgID
+	cr.Status.RotatedFor = rotatedFor
 	return markReady(ctx, r.Client, r.Config, cr, statusFields{
 		conditions: &cr.Status.Conditions, ready: &cr.Status.Ready, lastSyncTime: &cr.Status.LastSyncTime,
 	}, statusChanged)
 }
 
 func (r *OIDCAppReconciler) findOrCreateApp(ctx context.Context, projectID, displayName string, cr *zitadelv1alpha2.OIDCApp) (appID, clientID, clientSecret string, err error) {
-	existingAppID, existingApp := r.findAppByName(ctx, projectID, displayName)
+	if err := r.checkOutputSecret(ctx, cr); err != nil {
+		return "", "", "", err
+	}
+	var existingAppID string
+	var existingApp *applicationv2.Application
+	if cr.Status.ApplicationId != "" {
+		if cr.Status.ProjectId != "" && cr.Status.ProjectId != projectID {
+			return "", "", "", fmt.Errorf("an existing OIDC application cannot move projects; create a new OIDCApp")
+		}
+		resp, getErr := zclient(ctx, r.Zitadel).Application().GetApplication(ctx, &applicationv2.GetApplicationRequest{ApplicationId: cr.Status.ApplicationId})
+		if getErr != nil {
+			return "", "", "", fmt.Errorf("getting managed OIDC application: %w", getErr)
+		}
+		existingApp = resp.GetApplication()
+		if existingApp.GetProjectId() != projectID {
+			return "", "", "", fmt.Errorf("managed application belongs to a different project")
+		}
+		existingAppID = existingApp.GetApplicationId()
+		if existingAppID != cr.Status.ApplicationId {
+			return "", "", "", fmt.Errorf("managed application ID mismatch")
+		}
+	} else {
+		existingAppID, existingApp, err = r.findAppByName(ctx, projectID, displayName)
+	}
+	if err != nil {
+		return "", "", "", err
+	}
 
 	if existingAppID == "" {
 		return r.createOIDCApp(ctx, projectID, cr)
 	}
 
 	appID = existingAppID
+	if existingApp.GetOidcConfiguration() == nil {
+		return "", "", "", fmt.Errorf("matching application is not OIDC")
+	}
 	clientID = r.getClientIDFromApp(existingApp)
+	if clientID == "" {
+		return "", "", "", fmt.Errorf("existing OIDC application has no client ID")
+	}
+	// Validate credential recovery before changing the remote authentication method.
+	_, authMethod := zitadelAppType(cr.Spec.Type, cr.Spec.AuthMethod)
+	rotate := authMethod != applicationv2.OIDCAuthMethodType_OIDC_AUTH_METHOD_TYPE_NONE && cr.Spec.RotateSecret != "" && cr.Spec.RotateSecret != cr.Status.RotatedFor
+	if authMethod != applicationv2.OIDCAuthMethodType_OIDC_AUTH_METHOD_TYPE_NONE && !rotate {
+		secret := &corev1.Secret{}
+		err = r.Get(ctx, types.NamespacedName{Namespace: cr.Namespace, Name: cr.Spec.SecretRef.Name}, secret)
+		if client.IgnoreNotFound(err) != nil {
+			return "", "", "", err
+		}
+		if len(secret.Data[clientSecretKey(cr)]) == 0 || string(secret.Data[clientIDKey(cr)]) != clientID {
+			return "", "", "", fmt.Errorf("existing application has no matching stored credential; set spec.rotateSecret explicitly to recover")
+		}
+	}
 	if err := r.updateOIDCAppIfNeeded(ctx, existingAppID, projectID, existingApp, cr); err != nil {
 		return "", "", "", err
 	}
-	// Adoption path: the client secret of an existing app cannot be read back.
-	// Regenerate it unless the referenced Secret already holds one.
-	if cr.Spec.Type == "confidential" && cr.Spec.AuthMethod != "none" {
-		clientSecret, err = regenerateAdoptedClientSecret(ctx, r.Client, zclient(ctx, r.Zitadel).Application(),
-			cr.Namespace, cr.Spec.SecretRef.Name, clientSecretKey(cr), projectID, existingAppID)
-		if err != nil {
-			return "", "", "", err
+	if rotate {
+		resp, e := zclient(ctx, r.Zitadel).Application().GenerateClientSecret(ctx, &applicationv2.GenerateClientSecretRequest{ApplicationId: appID, ProjectId: projectID})
+		if e != nil {
+			return "", "", "", e
+		}
+		clientSecret = resp.GetClientSecret()
+		if clientSecret == "" {
+			return "", "", "", fmt.Errorf("credential rotation returned no secret")
 		}
 	}
 	return appID, clientID, clientSecret, nil
 }
 
-func (r *OIDCAppReconciler) findAppByName(ctx context.Context, projectID, appName string) (string, *applicationv2.Application) {
+func (r *OIDCAppReconciler) findAppByName(ctx context.Context, projectID, appName string) (string, *applicationv2.Application, error) {
 	listResp, err := zclient(ctx, r.Zitadel).Application().ListApplications(ctx, &applicationv2.ListApplicationsRequest{
 		Filters: []*applicationv2.ApplicationSearchFilter{
+			{Filter: &applicationv2.ApplicationSearchFilter_NameFilter{NameFilter: &applicationv2.ApplicationNameFilter{Name: appName, Method: filterv2.TextFilterMethod_TEXT_FILTER_METHOD_EQUALS}}},
 			{
 				Filter: &applicationv2.ApplicationSearchFilter_ProjectIdFilter{
 					ProjectIdFilter: &applicationv2.ProjectIDFilter{
@@ -169,16 +228,16 @@ func (r *OIDCAppReconciler) findAppByName(ctx context.Context, projectID, appNam
 		},
 	})
 	if err != nil {
-		return "", nil
+		return "", nil, err
 	}
-
-	for _, app := range listResp.GetApplications() {
-		if app.GetName() == appName {
-			appID := app.GetApplicationId()
-			return appID, app
-		}
+	if len(listResp.GetApplications()) > 1 || listResp.GetPagination().GetTotalResult() > 1 {
+		return "", nil, fmt.Errorf("ambiguous application name %q", appName)
 	}
-	return "", nil
+	if len(listResp.GetApplications()) == 1 {
+		app := listResp.GetApplications()[0]
+		return app.GetApplicationId(), app, nil
+	}
+	return "", nil, nil
 }
 
 func (r *OIDCAppReconciler) createOIDCApp(ctx context.Context, projectID string, cr *zitadelv1alpha2.OIDCApp) (appID, clientID, clientSecret string, err error) {
@@ -197,7 +256,7 @@ func (r *OIDCAppReconciler) createOIDCApp(ctx context.Context, projectID string,
 				RedirectUris:             cr.Spec.RedirectUris,
 				PostLogoutRedirectUris:   cr.Spec.PostLogoutRedirectUris,
 				ResponseTypes:            []applicationv2.OIDCResponseType{applicationv2.OIDCResponseType_OIDC_RESPONSE_TYPE_CODE},
-				GrantTypes:               []applicationv2.OIDCGrantType{applicationv2.OIDCGrantType_OIDC_GRANT_TYPE_AUTHORIZATION_CODE},
+				GrantTypes:               desiredGrantTypes(cr),
 				ApplicationType:          appType,
 				AuthMethodType:           authMethod,
 				AccessTokenType:          accessTokenType,
@@ -238,8 +297,11 @@ func (r *OIDCAppReconciler) updateOIDCAppIfNeeded(ctx context.Context, appID, pr
 	}
 	oidcConfig := app.GetOidcConfiguration()
 	if oidcConfig == nil {
-		return nil
+		return fmt.Errorf("matching application is not OIDC")
 	}
+	appType, authMethod := zitadelAppType(cr.Spec.Type, cr.Spec.AuthMethod)
+	grants := desiredGrantTypes(cr)
+	protocolChanged := oidcConfig.GetApplicationType() != appType || oidcConfig.GetAuthMethodType() != authMethod || !slices.Equal(oidcConfig.GetGrantTypes(), grants)
 
 	// Detect drift across all mutable fields.
 	redirectsChanged := !reflect.DeepEqual(oidcConfig.GetRedirectUris(), cr.Spec.RedirectUris)
@@ -255,7 +317,8 @@ func (r *OIDCAppReconciler) updateOIDCAppIfNeeded(ctx context.Context, appID, pr
 	idTokenRoleChanged := oidcConfig.GetIdTokenRoleAssertion() != cr.Spec.IdTokenRoleAssertion
 	idTokenUserinfoChanged := oidcConfig.GetIdTokenUserinfoAssertion() != cr.Spec.IdTokenUserinfoAssertion
 
-	if !redirectsChanged && !postLogoutChanged && !accessTokenTypeChanged && !accessTokenRoleChanged && !idTokenRoleChanged && !idTokenUserinfoChanged {
+	configChanged := protocolChanged || redirectsChanged || postLogoutChanged || accessTokenTypeChanged || accessTokenRoleChanged || idTokenRoleChanged || idTokenUserinfoChanged
+	if !configChanged && app.GetName() == cr.DisplayName() {
 		return nil
 	}
 
@@ -278,12 +341,17 @@ func (r *OIDCAppReconciler) updateOIDCAppIfNeeded(ctx context.Context, appID, pr
 	if app.GetName() != cr.DisplayName() {
 		updateName = cr.DisplayName()
 	}
-	_, err := zclient(ctx, r.Zitadel).Application().UpdateApplication(ctx, &applicationv2.UpdateApplicationRequest{
+	req := &applicationv2.UpdateApplicationRequest{
 		ApplicationId: appID,
 		ProjectId:     projectID,
 		Name:          updateName,
-		ApplicationType: &applicationv2.UpdateApplicationRequest_OidcConfiguration{
+	}
+	if configChanged {
+		req.ApplicationType = &applicationv2.UpdateApplicationRequest_OidcConfiguration{
 			OidcConfiguration: &applicationv2.UpdateOIDCApplicationConfigurationRequest{
+				ApplicationType:          &appType,
+				AuthMethodType:           &authMethod,
+				GrantTypes:               grants,
 				RedirectUris:             cr.Spec.RedirectUris,
 				PostLogoutRedirectUris:   cr.Spec.PostLogoutRedirectUris,
 				AccessTokenType:          &desiredAccessTokenType,
@@ -291,8 +359,9 @@ func (r *OIDCAppReconciler) updateOIDCAppIfNeeded(ctx context.Context, appID, pr
 				IdTokenRoleAssertion:     &cr.Spec.IdTokenRoleAssertion,
 				IdTokenUserinfoAssertion: &cr.Spec.IdTokenUserinfoAssertion,
 			},
-		},
-	})
+		}
+	}
+	_, err := zclient(ctx, r.Zitadel).Application().UpdateApplication(ctx, req)
 	if err != nil {
 		return fmt.Errorf("updating OIDC application: %w", err)
 	}
@@ -322,12 +391,18 @@ func (r *OIDCAppReconciler) ensureSecret(ctx context.Context, cr *zitadelv1alpha
 	}
 
 	_, err := controllerutil.CreateOrUpdate(ctx, r.Client, secret, func() error {
+		if err := claimOIDCSecret(cr, secret); err != nil {
+			return err
+		}
 		if secret.Data == nil {
 			secret.Data = make(map[string][]byte)
 		}
 		secret.Data[clientIDKey(cr)] = []byte(clientID)
 		secret.Data[clientSecretKey(cr)] = []byte(clientSecret)
 		for k, v := range cr.Spec.SecretRef.ExtraData {
+			if k == clientIDKey(cr) || k == clientSecretKey(cr) {
+				return fmt.Errorf("extraData must not overwrite credential keys")
+			}
 			secret.Data[k] = []byte(v)
 		}
 		return nil
@@ -356,12 +431,23 @@ func (r *OIDCAppReconciler) ensureSecretClientID(ctx context.Context, cr *zitade
 				},
 				Data: data,
 			}
+			if err := claimOIDCSecret(cr, newSecret); err != nil {
+				return err
+			}
 			return r.Create(ctx, newSecret)
 		}
 		return err
 	}
+	if err := claimOIDCSecret(cr, secret); err != nil {
+		return err
+	}
 
 	updated := false
+	_, authMethod := zitadelAppType(cr.Spec.Type, cr.Spec.AuthMethod)
+	if authMethod == applicationv2.OIDCAuthMethodType_OIDC_AUTH_METHOD_TYPE_NONE && secret.Data[clientSecretKey(cr)] != nil {
+		delete(secret.Data, clientSecretKey(cr))
+		updated = true
+	}
 	if secret.Data == nil {
 		secret.Data = make(map[string][]byte)
 	}
@@ -371,6 +457,9 @@ func (r *OIDCAppReconciler) ensureSecretClientID(ctx context.Context, cr *zitade
 		updated = true
 	}
 	for k, v := range cr.Spec.SecretRef.ExtraData {
+		if k == clientIDKey(cr) || k == clientSecretKey(cr) {
+			return fmt.Errorf("extraData must not overwrite credential keys")
+		}
 		if string(secret.Data[k]) != v {
 			secret.Data[k] = []byte(v)
 			updated = true
@@ -380,6 +469,44 @@ func (r *OIDCAppReconciler) ensureSecretClientID(ctx context.Context, cr *zitade
 		return r.Update(ctx, secret)
 	}
 	return nil
+}
+
+func desiredGrantTypes(cr *zitadelv1alpha2.OIDCApp) []applicationv2.OIDCGrantType {
+	grants := []applicationv2.OIDCGrantType{applicationv2.OIDCGrantType_OIDC_GRANT_TYPE_AUTHORIZATION_CODE}
+	if slices.Contains(cr.Spec.GrantTypes, "refresh_token") {
+		grants = append(grants, applicationv2.OIDCGrantType_OIDC_GRANT_TYPE_REFRESH_TOKEN)
+	}
+	return grants
+}
+
+func claimOIDCSecret(cr *zitadelv1alpha2.OIDCApp, secret *corev1.Secret) error {
+	if secret.ResourceVersion != "" && !metav1.IsControlledBy(secret, cr) {
+		return fmt.Errorf("output Secret %s already exists and is not owned by this OIDCApp", secret.Name)
+	}
+	if secret.ResourceVersion == "" {
+		secret.OwnerReferences = []metav1.OwnerReference{*metav1.NewControllerRef(cr, zitadelv1alpha2.GroupVersion.WithKind("OIDCApp"))}
+	}
+	return nil
+}
+
+func (r *OIDCAppReconciler) checkOutputSecret(ctx context.Context, cr *zitadelv1alpha2.OIDCApp) error {
+	if cr.Spec.SecretRef.Name == "" {
+		return fmt.Errorf("secretRef.name is required")
+	}
+	if clientIDKey(cr) == clientSecretKey(cr) {
+		return fmt.Errorf("client ID and secret keys must differ")
+	}
+	for key := range cr.Spec.SecretRef.ExtraData {
+		if key == clientIDKey(cr) || key == clientSecretKey(cr) {
+			return fmt.Errorf("extraData must not overwrite credential keys")
+		}
+	}
+	secret := &corev1.Secret{}
+	err := r.Get(ctx, types.NamespacedName{Namespace: cr.Namespace, Name: cr.Spec.SecretRef.Name}, secret)
+	if err != nil {
+		return client.IgnoreNotFound(err)
+	}
+	return claimOIDCSecret(cr, secret)
 }
 
 // SetupWithManager sets up the controller with the Manager.

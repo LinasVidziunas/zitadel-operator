@@ -46,21 +46,18 @@ func (r *OrganizationReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	}
 
 	// Handle deletion.
-	if !cr.DeletionTimestamp.IsZero() {
+	if done, result, err := handleDeletionStrict(ctx, r.Client, &cr, func() error {
 		if cr.Status.OrganizationId != "" {
 			_, err := r.Zitadel.Organization().DeleteOrganization(ctx, &orgv2.DeleteOrganizationRequest{
 				OrganizationId: cr.Status.OrganizationId,
 			})
 			if err != nil && status.Code(err) != codes.NotFound {
-				return ctrl.Result{}, fmt.Errorf("deleting organization: %w", err)
+				return fmt.Errorf("deleting organization: %w", err)
 			}
 		}
-		if removeFinalizer(&cr) {
-			if err := r.Update(ctx, &cr); err != nil {
-				return ctrl.Result{}, err
-			}
-		}
-		return ctrl.Result{}, nil
+		return nil
+	}); done {
+		return result, err
 	}
 
 	// Add finalizer if not present.

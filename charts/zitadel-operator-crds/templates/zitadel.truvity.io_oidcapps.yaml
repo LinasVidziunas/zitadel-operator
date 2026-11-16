@@ -68,6 +68,28 @@ spec:
                 - basic
                 - none
                 type: string
+              deletionPolicy:
+                default: Retain
+                description: DeletionPolicy controls remote cleanup. Retain leaves
+                  the application intact.
+                enum:
+                - Retain
+                - Delete
+                type: string
+              grantTypes:
+                description: GrantTypes defaults to authorization_code. Add refresh_token
+                  for offline access.
+                items:
+                  enum:
+                  - authorization_code
+                  - refresh_token
+                  type: string
+                minItems: 1
+                type: array
+                x-kubernetes-list-type: set
+                x-kubernetes-validations:
+                - message: authorization_code is required
+                  rule: self.exists(g, g == 'authorization_code')
               idTokenRoleAssertion:
                 description: IdTokenRoleAssertion includes the user's project role
                   claims in the ID token.
@@ -130,6 +152,10 @@ spec:
                 items:
                   type: string
                 type: array
+              rotateSecret:
+                description: RotateSecret explicitly authorizes credential recovery/rotation.
+                  Change the value to rotate again.
+                type: string
               secretRef:
                 description: SecretRef references the Secret where the client credentials
                   will be stored.
@@ -272,6 +298,10 @@ spec:
               ready:
                 description: Ready indicates whether the OIDCApp is successfully synced.
                 type: boolean
+              rotatedFor:
+                description: RotatedFor records the last completed explicit credential
+                  rotation.
+                type: string
             type: object
         type: object
     served: true

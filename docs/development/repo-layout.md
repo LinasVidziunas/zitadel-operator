@@ -42,7 +42,7 @@ zitadel-operator/
 
 ## Orientation rules
 
-- **Generated files** (`zz_generated.deepcopy.go`, `config/crd/bases/`, CRD chart templates, `docs/reference/api.md`) are committed and gated by `just verify-generate` — regenerate with `just generate`, never edit by hand.
+- **Generated files** (`zz_generated.deepcopy.go`, CRD chart templates, `schemas/`, `docs/reference/api.md`) are committed and gated by `just verify-generate`. `config/crd/bases/` is an ignored intermediate output. Regenerate with `just generate`, never edit generated files by hand.
 - **`internal/` is not importable** — the operator deliberately exposes no Go API surface beyond the CRD types in `api/`.
 - **One controller file per kind** in `internal/controller/`, named `<kind>_controller.go`; cross-cutting behavior belongs in the shared files, not copied per controller.
 - **Unit tests** sit next to their code (`internal/**/**_test.go`, no build tag, run in CI); **integration tests** live only under `tests/integration/` behind the `integration` build tag (not run in CI).

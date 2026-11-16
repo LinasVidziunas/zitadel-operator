@@ -6,6 +6,23 @@ import (
 
 // OIDCAppSpec defines the desired state of OIDCApp.
 type OIDCAppSpec struct {
+	// DeletionPolicy controls remote cleanup. Retain leaves the application intact.
+	// +kubebuilder:validation:Enum=Retain;Delete
+	// +kubebuilder:default=Retain
+	// +optional
+	DeletionPolicy string `json:"deletionPolicy,omitempty"`
+
+	// GrantTypes defaults to authorization_code. Add refresh_token for offline access.
+	// +kubebuilder:validation:XValidation:rule="self.exists(g, g == 'authorization_code')",message="authorization_code is required"
+	// +kubebuilder:validation:MinItems=1
+	// +kubebuilder:validation:items:Enum=authorization_code;refresh_token
+	// +listType=set
+	// +optional
+	GrantTypes []string `json:"grantTypes,omitempty"`
+
+	// RotateSecret explicitly authorizes credential recovery/rotation. Change the value to rotate again.
+	// +optional
+	RotateSecret string `json:"rotateSecret,omitempty"`
 	// Instance optionally pins this resource to one operator's instance
 	// identity — the operator config's instanceAlias, defaulting to its
 	// domain (v0.18 dual-serving). When set to another identity, the CR is
@@ -87,6 +104,9 @@ type OIDCAppSpec struct {
 
 // OIDCAppStatus defines the observed state of OIDCApp.
 type OIDCAppStatus struct {
+	// RotatedFor records the last completed explicit credential rotation.
+	// +optional
+	RotatedFor string `json:"rotatedFor,omitempty"`
 	// ApplicationId is the Zitadel application ID.
 	ApplicationId string `json:"applicationId,omitempty"`
 

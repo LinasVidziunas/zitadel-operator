@@ -1,0 +1,307 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "additionalProperties": false,
+  "description": "OIDCApp is the Schema for the oidcapps API.",
+  "properties": {
+    "apiVersion": {
+      "enum": [
+        "zitadel.truvity.io/v1alpha2"
+      ],
+      "type": "string"
+    },
+    "kind": {
+      "enum": [
+        "OIDCApp"
+      ],
+      "type": "string"
+    },
+    "metadata": {
+      "properties": {
+        "annotations": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "type": "object"
+        },
+        "labels": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "type": "object"
+        },
+        "name": {
+          "type": "string"
+        },
+        "namespace": {
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "spec": {
+      "additionalProperties": false,
+      "description": "OIDCAppSpec defines the desired state of OIDCApp.",
+      "properties": {
+        "accessTokenRoleAssertion": {
+          "description": "AccessTokenRoleAssertion includes the user's project role claims in\nthe access token.",
+          "type": "boolean"
+        },
+        "accessTokenType": {
+          "description": "AccessTokenType selects the access token format: \"bearer\" (opaque,\ndefault) or \"jwt\" (self-contained, locally verifiable).",
+          "enum": [
+            "bearer",
+            "jwt"
+          ],
+          "type": "string"
+        },
+        "authMethod": {
+          "description": "AuthMethod is the authentication method.",
+          "enum": [
+            "basic",
+            "none"
+          ],
+          "type": "string"
+        },
+        "deletionPolicy": {
+          "default": "Retain",
+          "description": "DeletionPolicy controls remote cleanup. Retain leaves the application intact.",
+          "enum": [
+            "Retain",
+            "Delete"
+          ],
+          "type": "string"
+        },
+        "grantTypes": {
+          "description": "GrantTypes defaults to authorization_code. Add refresh_token for offline access.",
+          "items": {
+            "enum": [
+              "authorization_code",
+              "refresh_token"
+            ],
+            "type": "string"
+          },
+          "minItems": 1,
+          "type": "array",
+          "x-kubernetes-list-type": "set",
+          "x-kubernetes-validations": [
+            {
+              "message": "authorization_code is required",
+              "rule": "self.exists(g, g == 'authorization_code')"
+            }
+          ]
+        },
+        "idTokenRoleAssertion": {
+          "description": "IdTokenRoleAssertion includes the user's project role claims in the ID token.",
+          "type": "boolean"
+        },
+        "idTokenUserinfoAssertion": {
+          "description": "IdTokenUserinfoAssertion asserts the userinfo claims (including\naction-appended claims such as the rbac-mapper's groups) into the ID\ntoken at issuance. Required for consumers that read groups from the ID\ntoken (ArgoCD, kubelogin-style flows).",
+          "type": "boolean"
+        },
+        "instance": {
+          "description": "Instance optionally pins this resource to one operator's instance\nidentity — the operator config's instanceAlias, defaulting to its\ndomain (v0.18 dual-serving). When set to another identity, the CR is\nignored entirely so the owning operator can manage it. When empty\nwhile the namespace is served by two operators, both fail closed with\nan AmbiguousInstance condition.",
+          "type": "string"
+        },
+        "name": {
+          "description": "Name is the display name of the application in Zitadel.\nIf empty, the Kubernetes resource name is used.",
+          "type": "string"
+        },
+        "postLogoutRedirectUris": {
+          "description": "PostLogoutRedirectUris is the list of allowed URIs to return users to\nafter logout (RP-initiated logout). Drift-corrected like RedirectUris.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "projectId": {
+          "description": "ProjectId references a pre-existing Zitadel project by raw ID.\nMutually exclusive with ProjectRef.",
+          "type": "string"
+        },
+        "projectRef": {
+          "additionalProperties": false,
+          "description": "ProjectRef references a Project CR managed by this operator.\nMutually exclusive with ProjectId.",
+          "properties": {
+            "name": {
+              "description": "Name is the name of the referenced resource.",
+              "type": "string"
+            },
+            "namespace": {
+              "description": "Namespace is the namespace of the referenced resource.\nIf empty, defaults to the same namespace as the referencing resource.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "name"
+          ],
+          "type": "object"
+        },
+        "redirectUris": {
+          "description": "RedirectUris is the exact, ordered list of allowed OAuth2/OIDC redirect\nURIs. The operator is the single writer: server-side drift (added or\nremoved entries) is reverted to this list on every reconcile. Zitadel\nrequires https:// URIs unless the app has dev mode enabled.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "rotateSecret": {
+          "description": "RotateSecret explicitly authorizes credential recovery/rotation. Change the value to rotate again.",
+          "type": "string"
+        },
+        "secretRef": {
+          "additionalProperties": false,
+          "description": "SecretRef references the Secret where the client credentials will be stored.",
+          "properties": {
+            "extraData": {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "description": "ExtraData adds static key-value pairs to the generated secret.",
+              "type": "object"
+            },
+            "keys": {
+              "additionalProperties": false,
+              "description": "Keys customizes the secret key names for clientId and clientSecret.\nDefaults: clientId → \"client_id\", clientSecret → \"client_secret\"",
+              "properties": {
+                "clientId": {
+                  "description": "ClientId is the key name for the client ID in the generated secret.\nDefault: \"client_id\"",
+                  "type": "string"
+                },
+                "clientSecret": {
+                  "description": "ClientSecret is the key name for the client secret in the generated secret.\nDefault: \"client_secret\"",
+                  "type": "string"
+                }
+              },
+              "type": "object"
+            },
+            "name": {
+              "description": "Name is the name of the Secret.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "name"
+          ],
+          "type": "object"
+        },
+        "type": {
+          "description": "Type is the OIDC application type:\n  - confidential: a server-side client (Zitadel WEB) that holds a\n    client secret, written to secretRef.\n  - public: a browser SPA (Zitadel USER_AGENT), PKCE, no secret.\n  - native: a CLI or desktop client (Zitadel NATIVE), PKCE, no\n    secret. The one type for which Zitadel applies the RFC 8252\n    loopback rule: a redirect URI of http://localhost/... matches\n    ANY port, which is what a CLI listening on a random port for\n    its callback needs (kargo login --sso registers\n    http://localhost/auth/callback). Web and SPA types match\n    redirect URIs exactly and refuse http:// without dev mode.",
+          "enum": [
+            "confidential",
+            "public",
+            "native"
+          ],
+          "type": "string"
+        }
+      },
+      "required": [
+        "authMethod",
+        "redirectUris",
+        "secretRef",
+        "type"
+      ],
+      "type": "object"
+    },
+    "status": {
+      "additionalProperties": false,
+      "description": "OIDCAppStatus defines the observed state of OIDCApp.",
+      "properties": {
+        "applicationId": {
+          "description": "ApplicationId is the Zitadel application ID.",
+          "type": "string"
+        },
+        "clientId": {
+          "description": "ClientId is the OIDC client ID assigned by Zitadel.",
+          "type": "string"
+        },
+        "conditions": {
+          "description": "Conditions represent the latest available observations of the resource's state.",
+          "items": {
+            "additionalProperties": false,
+            "description": "Condition contains details for one aspect of the current state of this API Resource.",
+            "properties": {
+              "lastTransitionTime": {
+                "description": "lastTransitionTime is the last time the condition transitioned from one status to another.\nThis should be when the underlying condition changed.  If that is not known, then using the time when the API field changed is acceptable.",
+                "format": "date-time",
+                "type": "string"
+              },
+              "message": {
+                "description": "message is a human readable message indicating details about the transition.\nThis may be an empty string.",
+                "maxLength": 32768,
+                "type": "string"
+              },
+              "observedGeneration": {
+                "description": "observedGeneration represents the .metadata.generation that the condition was set based upon.\nFor instance, if .metadata.generation is currently 12, but the .status.conditions[x].observedGeneration is 9, the condition is out of date\nwith respect to the current state of the instance.",
+                "format": "int64",
+                "minimum": 0,
+                "type": "integer"
+              },
+              "reason": {
+                "description": "reason contains a programmatic identifier indicating the reason for the condition's last transition.\nProducers of specific condition types may define expected values and meanings for this field,\nand whether the values are considered a guaranteed API.\nThe value should be a CamelCase string.\nThis field may not be empty.",
+                "maxLength": 1024,
+                "minLength": 1,
+                "pattern": "^[A-Za-z]([A-Za-z0-9_,:]*[A-Za-z0-9_])?$",
+                "type": "string"
+              },
+              "status": {
+                "description": "status of the condition, one of True, False, Unknown.",
+                "enum": [
+                  "True",
+                  "False",
+                  "Unknown"
+                ],
+                "type": "string"
+              },
+              "type": {
+                "description": "type of condition in CamelCase or in foo.example.com/CamelCase.",
+                "maxLength": 316,
+                "pattern": "^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$",
+                "type": "string"
+              }
+            },
+            "required": [
+              "lastTransitionTime",
+              "message",
+              "reason",
+              "status",
+              "type"
+            ],
+            "type": "object"
+          },
+          "type": "array",
+          "x-kubernetes-list-map-keys": [
+            "type"
+          ],
+          "x-kubernetes-list-type": "map"
+        },
+        "lastSyncTime": {
+          "description": "LastSyncTime is the last time the resource was synced with Zitadel.",
+          "format": "date-time",
+          "type": "string"
+        },
+        "organizationId": {
+          "description": "OrganizationId is the resolved organization ID (inherited from project).",
+          "type": "string"
+        },
+        "projectId": {
+          "description": "ProjectId is the resolved project ID this app belongs to.",
+          "type": "string"
+        },
+        "ready": {
+          "description": "Ready indicates whether the OIDCApp is successfully synced.",
+          "type": "boolean"
+        },
+        "rotatedFor": {
+          "description": "RotatedFor records the last completed explicit credential rotation.",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    }
+  },
+  "required": [
+    "apiVersion",
+    "kind",
+    "metadata"
+  ],
+  "title": "OIDCApp",
+  "type": "object"
+}

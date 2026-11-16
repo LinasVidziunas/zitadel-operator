@@ -51,7 +51,7 @@ func TestProjectRole_WithProjectRef(t *testing.T) {
 
 	proj := &zitadelv1alpha2.Project{
 		ObjectMeta: metav1.ObjectMeta{Name: projName, Namespace: "default"},
-		Spec:       zitadelv1alpha2.ProjectSpec{OrganizationId: testOrgID},
+		Spec:       zitadelv1alpha2.ProjectSpec{OrganizationId: testOrgID, DeletionPolicy: "Delete"},
 	}
 	if err := k8sClient.Create(ctx, proj); err != nil {
 		t.Fatalf("creating Project CR: %v", err)
@@ -122,7 +122,7 @@ func TestProjectRole_WithRawProjectIdAndDefaults(t *testing.T) {
 
 	proj := &zitadelv1alpha2.Project{
 		ObjectMeta: metav1.ObjectMeta{Name: projName, Namespace: "default"},
-		Spec:       zitadelv1alpha2.ProjectSpec{OrganizationId: testOrgID},
+		Spec:       zitadelv1alpha2.ProjectSpec{OrganizationId: testOrgID, DeletionPolicy: "Delete"},
 	}
 	if err := k8sClient.Create(ctx, proj); err != nil {
 		t.Fatalf("creating Project CR: %v", err)
@@ -208,7 +208,7 @@ func TestProjectRole_RefNotReadyThenReady(t *testing.T) {
 	// Now create the Project; the role must converge without manual help.
 	proj := &zitadelv1alpha2.Project{
 		ObjectMeta: metav1.ObjectMeta{Name: projName, Namespace: "default"},
-		Spec:       zitadelv1alpha2.ProjectSpec{OrganizationId: testOrgID},
+		Spec:       zitadelv1alpha2.ProjectSpec{OrganizationId: testOrgID, DeletionPolicy: "Delete"},
 	}
 	if err := k8sClient.Create(ctx, proj); err != nil {
 		t.Fatalf("creating Project CR: %v", err)

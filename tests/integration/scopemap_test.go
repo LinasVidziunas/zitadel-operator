@@ -200,6 +200,7 @@ func TestScopeMap_SelectorRuleMatch(t *testing.T) {
 	app := &zitadelv1alpha2.OIDCApp{
 		ObjectMeta: metav1.ObjectMeta{Name: fmt.Sprintf("v018-selapp-%d", ts), Namespace: nsName},
 		Spec: zitadelv1alpha2.OIDCAppSpec{
+			DeletionPolicy: "Delete",
 			// No projectRef/projectId: defaults to the scope's project.
 			Type:         "confidential",
 			AuthMethod:   "basic",
@@ -270,10 +271,11 @@ func TestScopeMap_LiteralMatch_DelegatedActorProof(t *testing.T) {
 	app := &zitadelv1alpha2.OIDCApp{
 		ObjectMeta: metav1.ObjectMeta{Name: fmt.Sprintf("v018-litapp-%d", ts), Namespace: nsName},
 		Spec: zitadelv1alpha2.OIDCAppSpec{
-			Type:         "confidential",
-			AuthMethod:   "basic",
-			RedirectUris: []string{"https://v018.example.com/callback"},
-			SecretRef:    zitadelv1alpha2.SecretRefSpec{Name: fmt.Sprintf("v018-litsecret-%d", ts)},
+			DeletionPolicy: "Delete",
+			Type:           "confidential",
+			AuthMethod:     "basic",
+			RedirectUris:   []string{"https://v018.example.com/callback"},
+			SecretRef:      zitadelv1alpha2.SecretRefSpec{Name: fmt.Sprintf("v018-litsecret-%d", ts)},
 		},
 	}
 	if err := k8sClient.Create(ctx, app); err != nil {
@@ -375,11 +377,12 @@ func TestScopeMap_NoMatch_FailClosed(t *testing.T) {
 	app := &zitadelv1alpha2.OIDCApp{
 		ObjectMeta: metav1.ObjectMeta{Name: fmt.Sprintf("v018-nomatchapp-%d", ts), Namespace: nsName},
 		Spec: zitadelv1alpha2.OIDCAppSpec{
-			ProjectId:    "000000000000000000", // never reached: fail-closed first
-			Type:         "confidential",
-			AuthMethod:   "basic",
-			RedirectUris: []string{"https://v018.example.com/callback"},
-			SecretRef:    zitadelv1alpha2.SecretRefSpec{Name: "v018-nomatchsecret"},
+			DeletionPolicy: "Delete",
+			ProjectId:      "000000000000000000", // never reached: fail-closed first
+			Type:           "confidential",
+			AuthMethod:     "basic",
+			RedirectUris:   []string{"https://v018.example.com/callback"},
+			SecretRef:      zitadelv1alpha2.SecretRefSpec{Name: "v018-nomatchsecret"},
 		},
 	}
 	if err := k8sClient.Create(ctx, app); err != nil {
@@ -432,11 +435,12 @@ func TestScopeMap_CrossMapConflict(t *testing.T) {
 	app := &zitadelv1alpha2.OIDCApp{
 		ObjectMeta: metav1.ObjectMeta{Name: fmt.Sprintf("v018-conflictapp-%d", ts), Namespace: nsName},
 		Spec: zitadelv1alpha2.OIDCAppSpec{
-			ProjectId:    "000000000000000000",
-			Type:         "confidential",
-			AuthMethod:   "basic",
-			RedirectUris: []string{"https://v018.example.com/callback"},
-			SecretRef:    zitadelv1alpha2.SecretRefSpec{Name: "v018-conflictsecret"},
+			DeletionPolicy: "Delete",
+			ProjectId:      "000000000000000000",
+			Type:           "confidential",
+			AuthMethod:     "basic",
+			RedirectUris:   []string{"https://v018.example.com/callback"},
+			SecretRef:      zitadelv1alpha2.SecretRefSpec{Name: "v018-conflictsecret"},
 		},
 	}
 	if err := k8sClient.Create(ctx, app); err != nil {
@@ -517,11 +521,12 @@ func TestScopeMap_InstanceMismatch(t *testing.T) {
 	app := &zitadelv1alpha2.OIDCApp{
 		ObjectMeta: metav1.ObjectMeta{Name: fmt.Sprintf("v018-mismatchapp-%d", ts), Namespace: nsName},
 		Spec: zitadelv1alpha2.OIDCAppSpec{
-			ProjectId:    "000000000000000000",
-			Type:         "confidential",
-			AuthMethod:   "basic",
-			RedirectUris: []string{"https://v018.example.com/callback"},
-			SecretRef:    zitadelv1alpha2.SecretRefSpec{Name: "v018-mismatchsecret"},
+			DeletionPolicy: "Delete",
+			ProjectId:      "000000000000000000",
+			Type:           "confidential",
+			AuthMethod:     "basic",
+			RedirectUris:   []string{"https://v018.example.com/callback"},
+			SecretRef:      zitadelv1alpha2.SecretRefSpec{Name: "v018-mismatchsecret"},
 		},
 	}
 	if err := k8sClient.Create(ctx, app); err != nil {

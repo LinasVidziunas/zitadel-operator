@@ -1,41 +1,40 @@
-# CI now calls the shared workflow (truvity/ci-workflows), which fans the
-# Justfile recipes out into PARALLEL jobs — one per recipe, each reporting
-# under its own name. Before this they ran serially inside a single
-# `just check` and a red result told you only that something failed.
-#
-# The recipe list mirrors this repo's own `check` recipe, so CI and a
-# laptop still run the same thing; they just no longer run it the same way.
-#
-# Pinned by COMMIT SHA, never by tag or branch: tags move, and every
-# repository in both organizations runs that code.
 name: CI
-
 on:
   pull_request:
     branches: [master]
   push:
     branches: [master]
-
 permissions:
   contents: read
-
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
-
 jobs:
-  recipes:
-    uses: truvity/ci-workflows/.github/workflows/check.yaml@eb317bdb3240d43404665cc943d1c00e8946f733 # v2.18.0
-    with:
-      recipes: '["build","test","lint","chart-lint","verify-generate"]'
-
-  # A stable context name for branch protection. The matrix jobs report as
-  # "recipes / build" and so on, so a required context naming them would
-  # break the moment a recipe is added or renamed.
   check:
-    needs: recipes
-    if: always()
     runs-on: ubuntu-latest
-    timeout-minutes: 5
     steps:
-      - run: '[ "${{ needs.recipes.result }}" = "success" ]'
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - uses: azure/setup-helm@v4
+        with:
+          version: v3.17.3
+      - run: go build ./cmd/...
+      - run: go test -race ./...
+      - run: go vet ./...
+      - name: Generated API and schema consistency
+        run: |
+          go run sigs.k8s.io/controller-tools/cmd/controller-gen@v0.21.0 object crd paths=./api/... output:crd:artifacts:config=config/crd/bases
+          cp config/crd/bases/*.yaml charts/zitadel-operator-crds/templates/
+          go run ./tools/schemas
+          go run github.com/elastic/crd-ref-docs@v0.3.0 --source-path=./api/v1alpha2 --config=docs/reference/crd-ref-docs.yaml --renderer=markdown --output-path=docs/reference/api.md
+          git diff --exit-code -- api/ config/crd/ charts/zitadel-operator-crds/templates/ schemas/ docs/reference/api.md
+      - name: Chart validation
+        run: |
+          helm lint charts/zitadel-operator --set config.domain=auth.example.com --set config.binding=iam-owner
+          helm lint charts/zitadel-operator-crds
+          helm template operator charts/zitadel-operator --set config.domain=auth.example.com --set config.binding=iam-owner > /dev/null
+          helm template crds charts/zitadel-operator-crds > /dev/null
+          helm template operator charts/zitadel-operator --set config.domain=auth.example.com --set config.binding=iam-owner --set bootstrap.enabled=true --set bootstrap.issuer=https://auth.example.com --set bootstrap.zitadelNamespace=zitadel > /dev/null
+          helm template operator charts/zitadel-operator --set config.domain=auth.example.com --set config.binding=iam-owner --set bootstrap.enabled=true --set bootstrap.issuer=https://auth.example.com --set bootstrap.generateKeys=false --set bootstrap.systemKeySecret=bootstrap-key --set bootstrap.machineKeySecret=machine-key > /dev/null

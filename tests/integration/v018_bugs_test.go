@@ -22,8 +22,7 @@ import (
 // TestINF430_AdoptedConfidentialApp_SecretRegenerated (S-260) reproduces
 // INF-430: a confidential app that already exists in Zitadel (created outside
 // the operator) is adopted by a matching CR; its client secret cannot be read
-// back, so when the referenced Secret does not hold one, the operator must
-// regenerate it and store a complete credential set.
+// back, so explicit spec.rotateSecret authorizes recovery into an output Secret.
 func TestINF430_AdoptedConfidentialApp_SecretRegenerated(t *testing.T) {
 	ctx := context.Background()
 	ts := time.Now().UnixMilli()
@@ -33,7 +32,7 @@ func TestINF430_AdoptedConfidentialApp_SecretRegenerated(t *testing.T) {
 
 	proj := &zitadelv1alpha2.Project{
 		ObjectMeta: metav1.ObjectMeta{Name: projName, Namespace: "default"},
-		Spec:       zitadelv1alpha2.ProjectSpec{OrganizationId: testOrgID},
+		Spec:       zitadelv1alpha2.ProjectSpec{OrganizationId: testOrgID, DeletionPolicy: "Delete"},
 	}
 	if err := k8sClient.Create(ctx, proj); err != nil {
 		t.Fatalf("creating Project: %v", err)
@@ -66,11 +65,13 @@ func TestINF430_AdoptedConfidentialApp_SecretRegenerated(t *testing.T) {
 	app := &zitadelv1alpha2.OIDCApp{
 		ObjectMeta: metav1.ObjectMeta{Name: appName, Namespace: "default"},
 		Spec: zitadelv1alpha2.OIDCAppSpec{
-			ProjectRef:   &zitadelv1alpha2.ResourceRef{Name: projName},
-			Type:         "confidential",
-			AuthMethod:   "basic",
-			RedirectUris: []string{"https://v018-adopt.example.com/cb"},
-			SecretRef:    zitadelv1alpha2.SecretRefSpec{Name: secretName},
+			DeletionPolicy: "Delete",
+			RotateSecret:   "adopt-1",
+			ProjectRef:     &zitadelv1alpha2.ResourceRef{Name: projName},
+			Type:           "confidential",
+			AuthMethod:     "basic",
+			RedirectUris:   []string{"https://v018-adopt.example.com/cb"},
+			SecretRef:      zitadelv1alpha2.SecretRefSpec{Name: secretName},
 		},
 	}
 	if err := k8sClient.Create(ctx, app); err != nil {
@@ -129,7 +130,7 @@ func TestINF400_URIListUpdate_NoStaleState(t *testing.T) {
 
 	proj := &zitadelv1alpha2.Project{
 		ObjectMeta: metav1.ObjectMeta{Name: projName, Namespace: "default"},
-		Spec:       zitadelv1alpha2.ProjectSpec{OrganizationId: testOrgID},
+		Spec:       zitadelv1alpha2.ProjectSpec{OrganizationId: testOrgID, DeletionPolicy: "Delete"},
 	}
 	if err := k8sClient.Create(ctx, proj); err != nil {
 		t.Fatalf("creating Project: %v", err)
@@ -139,11 +140,12 @@ func TestINF400_URIListUpdate_NoStaleState(t *testing.T) {
 	app := &zitadelv1alpha2.OIDCApp{
 		ObjectMeta: metav1.ObjectMeta{Name: appName, Namespace: "default"},
 		Spec: zitadelv1alpha2.OIDCAppSpec{
-			ProjectRef:   &zitadelv1alpha2.ResourceRef{Name: projName},
-			Type:         "confidential",
-			AuthMethod:   "basic",
-			RedirectUris: []string{"https://a.v018-inf400.example.com/cb"},
-			SecretRef:    zitadelv1alpha2.SecretRefSpec{Name: fmt.Sprintf("v018-inf400-secret-%d", ts)},
+			DeletionPolicy: "Delete",
+			ProjectRef:     &zitadelv1alpha2.ResourceRef{Name: projName},
+			Type:           "confidential",
+			AuthMethod:     "basic",
+			RedirectUris:   []string{"https://a.v018-inf400.example.com/cb"},
+			SecretRef:      zitadelv1alpha2.SecretRefSpec{Name: fmt.Sprintf("v018-inf400-secret-%d", ts)},
 		},
 	}
 	if err := k8sClient.Create(ctx, app); err != nil {

@@ -1,26 +1,19 @@
 name: Security
-
 on:
   push:
     branches: [master]
   pull_request:
     branches: [master]
   schedule:
-    - cron: "0 6 * * *" # daily 6am UTC
-
+    - cron: "0 6 * * *"
 permissions:
   contents: read
-
 jobs:
-  # The same recipe the shared workflow runs everywhere else, instead of
-  # a hand-rolled copy that installed devbox through an UNPINNED
-  # `curl | bash` -- eight repositories carried that identical block.
-  #
-  # Deliberately NOT in ci.yaml's recipe list, and deliberately not a
-  # required context. A standard-library advisory with no released fix
-  # would otherwise wedge every pull request on a finding nobody can act
-  # on, which is exactly what happened to pulumi-zitadel.
   govulncheck:
-    uses: truvity/ci-workflows/.github/workflows/check.yaml@eb317bdb3240d43404665cc943d1c00e8946f733 # v2.18.0
-    with:
-      recipes: '["vuln"]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - run: go run golang.org/x/vuln/cmd/govulncheck@v1.7.0 ./...

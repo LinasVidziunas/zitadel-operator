@@ -227,10 +227,11 @@ func TestDelegation_EagerRevoke_OnMapRemoval(t *testing.T) {
 	app := &zitadelv1alpha2.OIDCApp{
 		ObjectMeta: metav1.ObjectMeta{Name: fmt.Sprintf("v018-revokeapp-%d", ts), Namespace: nsName},
 		Spec: zitadelv1alpha2.OIDCAppSpec{
-			Type:         "confidential",
-			AuthMethod:   "basic",
-			RedirectUris: []string{"https://v018.example.com/callback"},
-			SecretRef:    zitadelv1alpha2.SecretRefSpec{Name: fmt.Sprintf("v018-revokesecret-%d", ts)},
+			DeletionPolicy: "Delete",
+			Type:           "confidential",
+			AuthMethod:     "basic",
+			RedirectUris:   []string{"https://v018.example.com/callback"},
+			SecretRef:      zitadelv1alpha2.SecretRefSpec{Name: fmt.Sprintf("v018-revokesecret-%d", ts)},
 		},
 	}
 	if err := k8sClient.Create(ctx, app); err != nil {

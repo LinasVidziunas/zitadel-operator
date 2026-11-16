@@ -49,42 +49,32 @@ func applyStatus(ctx context.Context, k8s client.Client, cfg *config.Config, obj
 	patch.SetGroupVersionKind(gvk)
 	patch.SetName(obj.GetName())
 	patch.SetNamespace(obj.GetNamespace())
+	// Do not advance a stale object's version past concurrent spec changes.
+	patch.SetResourceVersion(obj.GetResourceVersion())
 	if status, ok := m["status"]; ok {
 		patch.Object["status"] = status
 	} else {
 		patch.Object["status"] = map[string]interface{}{}
 	}
-	return k8s.Status().Patch(ctx, patch, client.Apply, //nolint:staticcheck // SA1019: unstructured apply-patch is the stable path for a minimal status-only SSA document; the typed Apply() API needs generated apply configurations
-		client.FieldOwner(fieldManagerFor(cfg)), client.ForceOwnership)
+	if err := k8s.Status().Patch(ctx, patch, client.Apply, //nolint:staticcheck // SA1019: minimal status-only SSA document
+		client.FieldOwner(fieldManagerFor(cfg)), client.ForceOwnership); err != nil {
+		return err
+	}
+	// A reconcile can update metadata/finalizers after announcing its status.
+	// Carry the server's new version forward instead of causing a stale update.
+	obj.SetResourceVersion(patch.GetResourceVersion())
+	return nil
 }
 
 // handleDeletion checks if the object is being deleted. If so, it calls the provided
-// deleteFunc (which may be nil for leave-as-is behavior), removes the finalizer, and
-// returns done=true. The caller should return immediately when done=true.
+// deleteFunc (which may be nil for leave-as-is behavior), then removes the finalizer
+// only after success. The caller should return immediately when done=true.
 func handleDeletion(ctx context.Context, k8s client.Client, obj client.Object, deleteFunc func() error) (done bool, result ctrl.Result, err error) { //nolint:unparam // result kept for caller pattern consistency
 	if obj.GetDeletionTimestamp().IsZero() {
 		return false, ctrl.Result{}, nil
 	}
-	if deleteFunc != nil {
-		if delErr := deleteFunc(); delErr != nil {
-			logger := log.FromContext(ctx)
-			logger.Info("cleanup during deletion returned error (non-blocking)", "error", delErr)
-		}
-	}
-	if removeFinalizer(obj) {
-		if err := k8s.Update(ctx, obj); err != nil {
-			return true, ctrl.Result{}, err
-		}
-	}
-	return true, ctrl.Result{}, nil
-}
-
-// handleDeletionStrict checks if the object is being deleted. If so, it calls the provided
-// deleteFunc and returns a hard error if it fails (blocking deletion until cleanup succeeds).
-// This variant is used when the external resource MUST be cleaned up before the finalizer is removed.
-func handleDeletionStrict(ctx context.Context, k8s client.Client, obj client.Object, deleteFunc func() error) (done bool, result ctrl.Result, err error) { //nolint:unparam // result kept for caller pattern consistency
-	if obj.GetDeletionTimestamp().IsZero() {
-		return false, ctrl.Result{}, nil
+	if obj.GetAnnotations()["zitadel.truvity.io/deletion-policy"] == "Retain" {
+		deleteFunc = nil
 	}
 	if deleteFunc != nil {
 		if delErr := deleteFunc(); delErr != nil {
@@ -97,6 +87,12 @@ func handleDeletionStrict(ctx context.Context, k8s client.Client, obj client.Obj
 		}
 	}
 	return true, ctrl.Result{}, nil
+}
+
+// handleDeletionStrict preserves the existing caller API. All cleanup now blocks
+// finalizer removal on failure.
+func handleDeletionStrict(ctx context.Context, k8s client.Client, obj client.Object, deleteFunc func() error) (done bool, result ctrl.Result, err error) { //nolint:unparam // result kept for caller pattern consistency
+	return handleDeletion(ctx, k8s, obj, deleteFunc)
 }
 
 // handleSingletonDeletion handles deletion for instance-default singleton policies.

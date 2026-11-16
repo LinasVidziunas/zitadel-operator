@@ -6,6 +6,11 @@ import (
 
 // ProjectSpec defines the desired state of Project.
 type ProjectSpec struct {
+	// DeletionPolicy controls whether pruning also removes the remote project.
+	// +kubebuilder:validation:Enum=Retain;Delete
+	// +kubebuilder:default=Retain
+	// +optional
+	DeletionPolicy string `json:"deletionPolicy,omitempty"`
 	// Instance optionally pins this resource to one operator's instance
 	// identity — the operator config's instanceAlias, defaulting to its
 	// domain (v0.18 dual-serving). When set to another identity, the CR is
@@ -46,7 +51,7 @@ type ProjectSpec struct {
 	// do not combine spec.roles with ProjectRole CRs targeting the same
 	// project, or the full-set sync will remove the roles they manage.
 	// +optional
-	Roles []string `json:"roles,omitempty"`
+	Roles []string `json:"roles"`
 }
 
 // ProjectStatus defines the observed state of Project.

@@ -1,0 +1,137 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "oneOf": [
+    {
+      "$ref": "actionexecution-v1alpha2.json"
+    },
+    {
+      "$ref": "actiontarget-v1alpha2.json"
+    },
+    {
+      "$ref": "apiapp-v1alpha2.json"
+    },
+    {
+      "$ref": "applicationkey-v1alpha2.json"
+    },
+    {
+      "$ref": "defaultdomainpolicy-v1alpha2.json"
+    },
+    {
+      "$ref": "defaultlabelpolicy-v1alpha2.json"
+    },
+    {
+      "$ref": "defaultlockoutpolicy-v1alpha2.json"
+    },
+    {
+      "$ref": "defaultloginpolicy-v1alpha2.json"
+    },
+    {
+      "$ref": "defaultmessagetext-v1alpha2.json"
+    },
+    {
+      "$ref": "defaultnotificationpolicy-v1alpha2.json"
+    },
+    {
+      "$ref": "defaultoidcsettings-v1alpha2.json"
+    },
+    {
+      "$ref": "defaultpasswordagepolicy-v1alpha2.json"
+    },
+    {
+      "$ref": "defaultpasswordcomplexitypolicy-v1alpha2.json"
+    },
+    {
+      "$ref": "defaultprivacypolicy-v1alpha2.json"
+    },
+    {
+      "$ref": "domain-v1alpha2.json"
+    },
+    {
+      "$ref": "emailprovider-v1alpha2.json"
+    },
+    {
+      "$ref": "githubidp-v1alpha2.json"
+    },
+    {
+      "$ref": "googleidp-v1alpha2.json"
+    },
+    {
+      "$ref": "humanuser-v1alpha2.json"
+    },
+    {
+      "$ref": "identityprovider-v1alpha2.json"
+    },
+    {
+      "$ref": "instancemember-v1alpha2.json"
+    },
+    {
+      "$ref": "labelpolicy-v1alpha2.json"
+    },
+    {
+      "$ref": "lockoutpolicy-v1alpha2.json"
+    },
+    {
+      "$ref": "loginpolicy-v1alpha2.json"
+    },
+    {
+      "$ref": "machineuser-v1alpha2.json"
+    },
+    {
+      "$ref": "messagetext-v1alpha2.json"
+    },
+    {
+      "$ref": "notificationpolicy-v1alpha2.json"
+    },
+    {
+      "$ref": "oidcapp-v1alpha2.json"
+    },
+    {
+      "$ref": "organization-v1alpha2.json"
+    },
+    {
+      "$ref": "orgmember-v1alpha2.json"
+    },
+    {
+      "$ref": "orgmetadata-v1alpha2.json"
+    },
+    {
+      "$ref": "passwordagepolicy-v1alpha2.json"
+    },
+    {
+      "$ref": "passwordcomplexitypolicy-v1alpha2.json"
+    },
+    {
+      "$ref": "personalaccesstoken-v1alpha2.json"
+    },
+    {
+      "$ref": "privacypolicy-v1alpha2.json"
+    },
+    {
+      "$ref": "projectgrantmember-v1alpha2.json"
+    },
+    {
+      "$ref": "projectgrant-v1alpha2.json"
+    },
+    {
+      "$ref": "projectmember-v1alpha2.json"
+    },
+    {
+      "$ref": "projectrole-v1alpha2.json"
+    },
+    {
+      "$ref": "project-v1alpha2.json"
+    },
+    {
+      "$ref": "samlapp-v1alpha2.json"
+    },
+    {
+      "$ref": "scopemap-v1alpha2.json"
+    },
+    {
+      "$ref": "smsprovider-v1alpha2.json"
+    },
+    {
+      "$ref": "usergrant-v1alpha2.json"
+    }
+  ]
+}

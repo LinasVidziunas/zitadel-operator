@@ -55,6 +55,10 @@ func (r *ProjectReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	if rsDone {
 		return rsResult, rsErr
 	}
+	if !cr.DeletionTimestamp.IsZero() && cr.Spec.DeletionPolicy != "Delete" {
+		_, result, err := handleDeletionStrict(ctx, r.Client, &cr, nil)
+		return result, err
+	}
 
 	// Resolve organization.
 	orgID, err := resolveScopedOrganizationId(ctx, r.Client, rs, cr.Spec.OrganizationRef, cr.Spec.OrganizationId, cr.Namespace)
@@ -185,7 +189,7 @@ func (r *ProjectReconciler) syncProjectConfiguration(ctx context.Context, cr *zi
 	if err := r.ensureProjectSettings(ctx, cr, projectID); err != nil {
 		return err
 	}
-	if len(cr.Spec.Roles) > 0 {
+	if cr.Spec.Roles != nil {
 		if err := r.syncRoles(ctx, projectID, orgID, cr.Spec.Roles); err != nil {
 			return fmt.Errorf("syncing roles: %w", err)
 		}
@@ -238,18 +242,21 @@ func (r *ProjectReconciler) syncRoles(ctx context.Context, projectID, orgID stri
 	ctx = metadata.AppendToOutgoingContext(ctx, "x-zitadel-orgid", orgID)
 
 	// List existing roles.
-	listResp, err := zclient(ctx, r.Zitadel).Management().ListProjectRoles(ctx, &management.ListProjectRolesRequest{ //nolint:staticcheck // SA1019: deprecated SDK v1 method, migrate to v2 when stable
-		ProjectId: projectID,
-		Query:     &object.ListQuery{Limit: 100},
-	})
-	if err != nil {
-		return fmt.Errorf("listing project roles: %w", err)
-	}
-
-	// Build set of existing role keys.
-	existing := make(map[string]bool, len(listResp.GetResult()))
-	for _, role := range listResp.GetResult() {
-		existing[role.GetKey()] = true
+	existing := make(map[string]bool)
+	for offset := uint64(0); ; {
+		page, err := zclient(ctx, r.Zitadel).Management().ListProjectRoles(ctx, &management.ListProjectRolesRequest{ //nolint:staticcheck // SA1019: v1 role API
+			ProjectId: projectID, Query: &object.ListQuery{Limit: 100, Offset: offset},
+		})
+		if err != nil {
+			return fmt.Errorf("listing project roles: %w", err)
+		}
+		for _, role := range page.GetResult() {
+			existing[role.GetKey()] = true
+		}
+		offset += uint64(len(page.GetResult()))
+		if len(page.GetResult()) == 0 || offset >= page.GetDetails().GetTotalResult() {
+			break
+		}
 	}
 
 	// Build set of desired role keys.

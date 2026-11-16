@@ -1,0 +1,229 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "additionalProperties": false,
+  "description": "DefaultLoginPolicy is the Schema for the defaultloginpolicies API.\nIt manages the instance-level default login policy (IAM_OWNER, Admin API).\nSingleton per instance: reconcile reads the current default, diffs all fields, updates on drift.",
+  "properties": {
+    "apiVersion": {
+      "enum": [
+        "zitadel.truvity.io/v1alpha2"
+      ],
+      "type": "string"
+    },
+    "kind": {
+      "enum": [
+        "DefaultLoginPolicy"
+      ],
+      "type": "string"
+    },
+    "metadata": {
+      "properties": {
+        "annotations": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "type": "object"
+        },
+        "labels": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "type": "object"
+        },
+        "name": {
+          "type": "string"
+        },
+        "namespace": {
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "spec": {
+      "additionalProperties": false,
+      "description": "DefaultLoginPolicySpec defines the desired state of DefaultLoginPolicy.",
+      "properties": {
+        "allowDomainDiscovery": {
+          "description": "AllowDomainDiscovery enables domain-based organization discovery.",
+          "type": "boolean"
+        },
+        "allowExternalIdp": {
+          "description": "AllowExternalIdp allows login with external identity providers.",
+          "type": "boolean"
+        },
+        "allowRegister": {
+          "description": "AllowRegister allows user self-registration.",
+          "type": "boolean"
+        },
+        "defaultRedirectUri": {
+          "description": "DefaultRedirectUri is the default redirect URI after login.",
+          "type": "string"
+        },
+        "externalLoginCheckLifetime": {
+          "description": "ExternalLoginCheckLifetime is the duration before external login re-verification (e.g., \"240h\").",
+          "type": "string"
+        },
+        "forceMfa": {
+          "description": "ForceMfa requires multi-factor authentication for all users.",
+          "type": "boolean"
+        },
+        "forceMfaLocalOnly": {
+          "description": "ForceMfaLocalOnly requires MFA only for local (non-IdP) users.",
+          "type": "boolean"
+        },
+        "hidePasswordReset": {
+          "description": "HidePasswordReset hides the \"forgot password\" link on the login page.",
+          "type": "boolean"
+        },
+        "idps": {
+          "description": "Idps is the list of identity providers allowed for login at the instance level.",
+          "items": {
+            "additionalProperties": false,
+            "description": "IdpReference references an identity provider either by CR reference or raw ID.",
+            "properties": {
+              "idpId": {
+                "description": "IdpId references a pre-existing Zitadel identity provider by raw ID.\nMutually exclusive with IdpRef.",
+                "type": "string"
+              },
+              "idpRef": {
+                "additionalProperties": false,
+                "description": "IdpRef references a GoogleIdP CR managed by this operator.\nMutually exclusive with IdpId.",
+                "properties": {
+                  "name": {
+                    "description": "Name is the name of the referenced resource.",
+                    "type": "string"
+                  },
+                  "namespace": {
+                    "description": "Namespace is the namespace of the referenced resource.\nIf empty, defaults to the same namespace as the referencing resource.",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "name"
+                ],
+                "type": "object"
+              }
+            },
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "ignoreUnknownUsernames": {
+          "description": "IgnoreUnknownUsernames prevents enumeration attacks by not revealing if a username exists.",
+          "type": "boolean"
+        },
+        "mfaInitSkipLifetime": {
+          "description": "MfaInitSkipLifetime is the duration a user can skip MFA setup after login (e.g., \"720h\").",
+          "type": "string"
+        },
+        "multiFactorCheckLifetime": {
+          "description": "MultiFactorCheckLifetime is the duration before MFA re-verification (e.g., \"12h\").",
+          "type": "string"
+        },
+        "passwordCheckLifetime": {
+          "description": "PasswordCheckLifetime is the duration before password re-verification is required (e.g., \"240h\").",
+          "type": "string"
+        },
+        "passwordlessType": {
+          "description": "PasswordlessType configures passwordless authentication.",
+          "enum": [
+            "not_allowed",
+            "allowed"
+          ],
+          "type": "string"
+        },
+        "secondFactorCheckLifetime": {
+          "description": "SecondFactorCheckLifetime is the duration before second factor re-verification (e.g., \"12h\").",
+          "type": "string"
+        },
+        "userLogin": {
+          "description": "UserLogin determines whether login with username/password is allowed.",
+          "type": "boolean"
+        }
+      },
+      "type": "object"
+    },
+    "status": {
+      "additionalProperties": false,
+      "description": "DefaultLoginPolicyStatus defines the observed state of DefaultLoginPolicy.",
+      "properties": {
+        "conditions": {
+          "description": "Conditions represent the latest available observations of the resource's state.",
+          "items": {
+            "additionalProperties": false,
+            "description": "Condition contains details for one aspect of the current state of this API Resource.",
+            "properties": {
+              "lastTransitionTime": {
+                "description": "lastTransitionTime is the last time the condition transitioned from one status to another.\nThis should be when the underlying condition changed.  If that is not known, then using the time when the API field changed is acceptable.",
+                "format": "date-time",
+                "type": "string"
+              },
+              "message": {
+                "description": "message is a human readable message indicating details about the transition.\nThis may be an empty string.",
+                "maxLength": 32768,
+                "type": "string"
+              },
+              "observedGeneration": {
+                "description": "observedGeneration represents the .metadata.generation that the condition was set based upon.\nFor instance, if .metadata.generation is currently 12, but the .status.conditions[x].observedGeneration is 9, the condition is out of date\nwith respect to the current state of the instance.",
+                "format": "int64",
+                "minimum": 0,
+                "type": "integer"
+              },
+              "reason": {
+                "description": "reason contains a programmatic identifier indicating the reason for the condition's last transition.\nProducers of specific condition types may define expected values and meanings for this field,\nand whether the values are considered a guaranteed API.\nThe value should be a CamelCase string.\nThis field may not be empty.",
+                "maxLength": 1024,
+                "minLength": 1,
+                "pattern": "^[A-Za-z]([A-Za-z0-9_,:]*[A-Za-z0-9_])?$",
+                "type": "string"
+              },
+              "status": {
+                "description": "status of the condition, one of True, False, Unknown.",
+                "enum": [
+                  "True",
+                  "False",
+                  "Unknown"
+                ],
+                "type": "string"
+              },
+              "type": {
+                "description": "type of condition in CamelCase or in foo.example.com/CamelCase.",
+                "maxLength": 316,
+                "pattern": "^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$",
+                "type": "string"
+              }
+            },
+            "required": [
+              "lastTransitionTime",
+              "message",
+              "reason",
+              "status",
+              "type"
+            ],
+            "type": "object"
+          },
+          "type": "array",
+          "x-kubernetes-list-map-keys": [
+            "type"
+          ],
+          "x-kubernetes-list-type": "map"
+        },
+        "lastSyncTime": {
+          "description": "LastSyncTime is the last time the resource was synced with Zitadel.",
+          "format": "date-time",
+          "type": "string"
+        },
+        "ready": {
+          "description": "Ready indicates whether the DefaultLoginPolicy is successfully synced.",
+          "type": "boolean"
+        }
+      },
+      "type": "object"
+    }
+  },
+  "required": [
+    "apiVersion",
+    "kind",
+    "metadata"
+  ],
+  "title": "DefaultLoginPolicy",
+  "type": "object"
+}

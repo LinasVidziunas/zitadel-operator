@@ -725,7 +725,7 @@ All scenarios below are IMPLEMENTED and run against the dedicated test instance;
 - **Test:** `TestMachineUser_KeyRotation_DualKey`
 
 ### S-260: INF-430 — adopted confidential app regenerates client secret
-- App pre-created in Zitadel; adopting CR with an empty Secret: `client_secret` regenerated exactly once (no churn on later reconciles)
+- App pre-created in Zitadel; adopting OIDC CR with `spec.rotateSecret` and no Secret: `client_secret` regenerated once after status persistence (no churn on later reconciles). Without explicit recovery, reconciliation fails.
 - **Test:** `TestINF430_AdoptedConfidentialApp_SecretRegenerated`
 
 ### S-261: INF-400 — URI-list update staleness repro

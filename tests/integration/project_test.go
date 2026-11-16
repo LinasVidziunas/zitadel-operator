@@ -25,6 +25,7 @@ func TestProject_WithDefaultOrg(t *testing.T) {
 			Namespace: "default",
 		},
 		Spec: zitadelv1alpha2.ProjectSpec{
+			DeletionPolicy: "Delete",
 			OrganizationId: testOrgID},
 	}
 	if err := k8sClient.Create(ctx, proj); err != nil {
@@ -80,6 +81,7 @@ func TestProject_WithOrganizationRef(t *testing.T) {
 			Namespace: "default",
 		},
 		Spec: zitadelv1alpha2.ProjectSpec{
+			DeletionPolicy: "Delete",
 			OrganizationRef: &zitadelv1alpha2.ResourceRef{
 				Name: orgName,
 			},
@@ -124,6 +126,7 @@ func TestProject_WithExplicitOrgId(t *testing.T) {
 			Namespace: "default",
 		},
 		Spec: zitadelv1alpha2.ProjectSpec{
+			DeletionPolicy: "Delete",
 			OrganizationId: testOrgID,
 		},
 	}
@@ -157,6 +160,7 @@ func TestProject_RolesSync(t *testing.T) {
 			Namespace: "default",
 		},
 		Spec: zitadelv1alpha2.ProjectSpec{
+			DeletionPolicy: "Delete",
 			OrganizationId: testOrgID,
 			Roles:          []string{"viewer", "admin", "editor"},
 		},

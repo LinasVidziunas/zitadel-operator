@@ -16,16 +16,25 @@ builds:
     ldflags:
       - -s -w -X main.Version={{.Version}}
 
+  - id: zitadel-bootstrap
+    main: ./cmd/bootstrap
+    binary: zitadel-bootstrap
+    env: [CGO_ENABLED=0]
+    goos: [linux]
+    goarch: [amd64, arm64]
+
 archives:
   - id: binary
     ids:
       - zitadel-operator
+      - zitadel-bootstrap
     formats: [tar.gz]
     name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
 
 kos:
   - id: zitadel-operator
     build: zitadel-operator
+    repositories: [ghcr.io/linasvidziunas/zitadel-operator/operator]
     tags:
       - "{{.Version}}"
       - latest
@@ -34,23 +43,38 @@ kos:
       - linux/arm64
     bare: true
     preserve_import_paths: false
-    base_import_paths: true
+    base_import_paths: false
     base_image: gcr.io/distroless/static:nonroot
     sbom: none
     labels:
       org.opencontainers.image.title: zitadel-operator
       org.opencontainers.image.version: "{{.Version}}"
-      org.opencontainers.image.source: https://github.com/truvity/zitadel-operator
+      org.opencontainers.image.source: https://github.com/LinasVidziunas/zitadel-operator
+
+  - id: zitadel-bootstrap
+    build: zitadel-bootstrap
+    repositories: [ghcr.io/linasvidziunas/zitadel-operator/bootstrap]
+    tags: ["{{.Version}}", latest]
+    platforms: [linux/amd64, linux/arm64]
+    bare: true
+    preserve_import_paths: false
+    base_import_paths: false
+    base_image: gcr.io/distroless/static:nonroot
+    sbom: none
+    labels:
+      org.opencontainers.image.title: zitadel-bootstrap
+      org.opencontainers.image.source: https://github.com/LinasVidziunas/zitadel-operator
 
 release:
   github:
-    owner: truvity
+    owner: LinasVidziunas
     name: zitadel-operator
   header: |
     ## Zitadel Operator {{ .Tag }}
 
-    Docker image: `ghcr.io/truvity/zitadel-operator:{{ .Version }}`
-    Helm chart: `oci://ghcr.io/truvity/charts/zitadel-operator:{{ .Version }}`
+    Docker image: `ghcr.io/linasvidziunas/zitadel-operator/operator:{{ .Version }}`
+    Bootstrap image: `ghcr.io/linasvidziunas/zitadel-operator/bootstrap:{{ .Version }}`
+    Helm chart: `oci://ghcr.io/linasvidziunas/charts/zitadel-operator:{{ .Version }}`
 
 changelog:
   use: github

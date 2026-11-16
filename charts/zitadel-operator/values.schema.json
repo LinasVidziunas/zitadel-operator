@@ -6,6 +6,24 @@
   "additionalProperties": false,
   "properties": {
     "global": { "type": "object" },
+    "bootstrap": {
+      "type": "object", "additionalProperties": false,
+      "properties": {
+        "enabled": {"type": "boolean"},
+        "image": {"type": "string"},
+        "issuer": {"type": "string"},
+        "systemUser": {"type": "string"},
+        "username": {"type": "string"},
+        "generateKeys": {"type": "boolean"},
+        "keysSecret": {"type": "string"},
+        "publicConfigMap": {"type": "string"},
+        "zitadelNamespace": {"type": "string"},
+        "timeoutSeconds": {"type": "integer", "minimum": 1},
+        "expires": {"type": "string"},
+        "systemKeySecret": {"type": "string"},
+        "machineKeySecret": {"type": "string"}
+      }
+    },
     "nameOverride": { "type": "string" },
     "fullnameOverride": { "type": "string" },
     "image": {

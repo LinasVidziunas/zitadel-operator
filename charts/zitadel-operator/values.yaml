@@ -3,11 +3,33 @@
 # Binding choice (iam-owner vs org-owner): docs/install/binding-levels.md
 
 image:
-  repository: ghcr.io/truvity/zitadel-operator/operator
+  repository: ghcr.io/linasvidziunas/zitadel-operator/operator
   tag: ""
   pullPolicy: IfNotPresent
 
 replicaCount: 1
+
+# Optional zero-click setup for an already initialized instance.
+# Keys are generated in-cluster by default. Flux loads the generated public
+# ConfigMap into the Zitadel HelmRelease (see docs/install/fork.md).
+bootstrap:
+  enabled: false
+  image: ghcr.io/linasvidziunas/zitadel-operator/bootstrap
+  issuer: ""
+  systemUser: gitops-bootstrap
+  username: zitadel-operator
+  generateKeys: true
+  # Generated names default to <release-fullname>-bootstrap-{keys,public}.
+  keysSecret: ""
+  publicConfigMap: ""
+  zitadelNamespace: ""
+  timeoutSeconds: 600
+  # Empty means effectively non-expiring (9999-12-31T23:59:59Z).
+  expires: ""
+  # Optional supplied-key mode: set generateKeys=false and configure public
+  # trust in Zitadel separately. Both Secrets contain key.pem.
+  systemKeySecret: ""
+  machineKeySecret: ""
 
 serviceAccount:
   create: true

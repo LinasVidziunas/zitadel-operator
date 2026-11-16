@@ -2021,6 +2021,9 @@ _Appears in:_
 
 | Field | Description | Default | Validation |
 | --- | --- | --- | --- |
+| `deletionPolicy` _string_ | DeletionPolicy controls remote cleanup. Retain leaves the application intact. | Retain | Enum: [Retain Delete] <br />Optional: \{\} <br /> |
+| `grantTypes` _string array_ | GrantTypes defaults to authorization_code. Add refresh_token for offline access. |  | MinItems: 1 <br />items:Enum: [authorization_code refresh_token] <br />Optional: \{\} <br /> |
+| `rotateSecret` _string_ | RotateSecret explicitly authorizes credential recovery/rotation. Change the value to rotate again. |  | Optional: \{\} <br /> |
 | `instance` _string_ | Instance optionally pins this resource to one operator's instance<br />identity — the operator config's instanceAlias, defaulting to its<br />domain (v0.18 dual-serving). When set to another identity, the CR is<br />ignored entirely so the owning operator can manage it. When empty<br />while the namespace is served by two operators, both fail closed with<br />an AmbiguousInstance condition. |  | Optional: \{\} <br /> |
 | `projectRef` _[ResourceRef](#resourceref)_ | ProjectRef references a Project CR managed by this operator.<br />Mutually exclusive with ProjectId. |  | Optional: \{\} <br /> |
 | `projectId` _string_ | ProjectId references a pre-existing Zitadel project by raw ID.<br />Mutually exclusive with ProjectRef. |  | Optional: \{\} <br /> |
@@ -2049,6 +2052,7 @@ _Appears in:_
 
 | Field | Description | Default | Validation |
 | --- | --- | --- | --- |
+| `rotatedFor` _string_ | RotatedFor records the last completed explicit credential rotation. |  | Optional: \{\} <br /> |
 | `applicationId` _string_ | ApplicationId is the Zitadel application ID. |  |  |
 | `clientId` _string_ | ClientId is the OIDC client ID assigned by Zitadel. |  |  |
 | `projectId` _string_ | ProjectId is the resolved project ID this app belongs to. |  |  |
@@ -2832,6 +2836,7 @@ _Appears in:_
 
 | Field | Description | Default | Validation |
 | --- | --- | --- | --- |
+| `deletionPolicy` _string_ | DeletionPolicy controls whether pruning also removes the remote project. | Retain | Enum: [Retain Delete] <br />Optional: \{\} <br /> |
 | `instance` _string_ | Instance optionally pins this resource to one operator's instance<br />identity — the operator config's instanceAlias, defaulting to its<br />domain (v0.18 dual-serving). When set to another identity, the CR is<br />ignored entirely so the owning operator can manage it. When empty<br />while the namespace is served by two operators, both fail closed with<br />an AmbiguousInstance condition. |  | Optional: \{\} <br /> |
 | `organizationRef` _[ResourceRef](#resourceref)_ | OrganizationRef references an Organization CR managed by this operator.<br />Mutually exclusive with OrganizationId. |  | Optional: \{\} <br /> |
 | `organizationId` _string_ | OrganizationId references a pre-existing Zitadel organization by raw ID.<br />Mutually exclusive with OrganizationRef. |  | Optional: \{\} <br /> |

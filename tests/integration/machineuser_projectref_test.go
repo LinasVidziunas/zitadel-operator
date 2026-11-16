@@ -29,7 +29,7 @@ func TestMachineUser_RolesWithProjectRef(t *testing.T) {
 
 	proj := &zitadelv1alpha2.Project{
 		ObjectMeta: metav1.ObjectMeta{Name: projName, Namespace: "default"},
-		Spec:       zitadelv1alpha2.ProjectSpec{OrganizationId: testOrgID},
+		Spec:       zitadelv1alpha2.ProjectSpec{OrganizationId: testOrgID, DeletionPolicy: "Delete"},
 	}
 	if err := k8sClient.Create(ctx, proj); err != nil {
 		t.Fatalf("creating Project CR: %v", err)

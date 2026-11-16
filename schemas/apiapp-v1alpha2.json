@@ -1,0 +1,226 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "additionalProperties": false,
+  "description": "APIApp is the Schema for the apiapps API.",
+  "properties": {
+    "apiVersion": {
+      "enum": [
+        "zitadel.truvity.io/v1alpha2"
+      ],
+      "type": "string"
+    },
+    "kind": {
+      "enum": [
+        "APIApp"
+      ],
+      "type": "string"
+    },
+    "metadata": {
+      "properties": {
+        "annotations": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "type": "object"
+        },
+        "labels": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "type": "object"
+        },
+        "name": {
+          "type": "string"
+        },
+        "namespace": {
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "spec": {
+      "additionalProperties": false,
+      "description": "APIAppSpec defines the desired state of APIApp.",
+      "properties": {
+        "authMethod": {
+          "description": "AuthMethod is the API authentication method.",
+          "enum": [
+            "basic",
+            "private_key_jwt"
+          ],
+          "type": "string"
+        },
+        "instance": {
+          "description": "Instance optionally pins this resource to one operator's instance\nidentity — the operator config's instanceAlias, defaulting to its\ndomain (v0.18 dual-serving). When set to another identity, the CR is\nignored entirely so the owning operator can manage it. When empty\nwhile the namespace is served by two operators, both fail closed with\nan AmbiguousInstance condition.",
+          "type": "string"
+        },
+        "name": {
+          "description": "Name is the display name of the application in Zitadel.\nIf empty, the Kubernetes resource name is used.",
+          "type": "string"
+        },
+        "projectId": {
+          "description": "ProjectId references a pre-existing Zitadel project by raw ID.\nMutually exclusive with ProjectRef.",
+          "type": "string"
+        },
+        "projectRef": {
+          "additionalProperties": false,
+          "description": "ProjectRef references a Project CR managed by this operator.\nMutually exclusive with ProjectId.",
+          "properties": {
+            "name": {
+              "description": "Name is the name of the referenced resource.",
+              "type": "string"
+            },
+            "namespace": {
+              "description": "Namespace is the namespace of the referenced resource.\nIf empty, defaults to the same namespace as the referencing resource.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "name"
+          ],
+          "type": "object"
+        },
+        "secretRef": {
+          "additionalProperties": false,
+          "description": "SecretRef references the Secret where the client credentials will be stored.",
+          "properties": {
+            "extraData": {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "description": "ExtraData adds static key-value pairs to the generated secret.",
+              "type": "object"
+            },
+            "keys": {
+              "additionalProperties": false,
+              "description": "Keys customizes the secret key names for clientId and clientSecret.\nDefaults: clientId → \"client_id\", clientSecret → \"client_secret\"",
+              "properties": {
+                "clientId": {
+                  "description": "ClientId is the key name for the client ID in the generated secret.\nDefault: \"client_id\"",
+                  "type": "string"
+                },
+                "clientSecret": {
+                  "description": "ClientSecret is the key name for the client secret in the generated secret.\nDefault: \"client_secret\"",
+                  "type": "string"
+                }
+              },
+              "type": "object"
+            },
+            "name": {
+              "description": "Name is the name of the Secret.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "name"
+          ],
+          "type": "object"
+        }
+      },
+      "required": [
+        "authMethod",
+        "secretRef"
+      ],
+      "type": "object"
+    },
+    "status": {
+      "additionalProperties": false,
+      "description": "APIAppStatus defines the observed state of APIApp.",
+      "properties": {
+        "applicationId": {
+          "description": "ApplicationId is the Zitadel application ID.",
+          "type": "string"
+        },
+        "clientId": {
+          "description": "ClientId is the API client ID assigned by Zitadel.",
+          "type": "string"
+        },
+        "conditions": {
+          "description": "Conditions represent the latest available observations of the resource's state.",
+          "items": {
+            "additionalProperties": false,
+            "description": "Condition contains details for one aspect of the current state of this API Resource.",
+            "properties": {
+              "lastTransitionTime": {
+                "description": "lastTransitionTime is the last time the condition transitioned from one status to another.\nThis should be when the underlying condition changed.  If that is not known, then using the time when the API field changed is acceptable.",
+                "format": "date-time",
+                "type": "string"
+              },
+              "message": {
+                "description": "message is a human readable message indicating details about the transition.\nThis may be an empty string.",
+                "maxLength": 32768,
+                "type": "string"
+              },
+              "observedGeneration": {
+                "description": "observedGeneration represents the .metadata.generation that the condition was set based upon.\nFor instance, if .metadata.generation is currently 12, but the .status.conditions[x].observedGeneration is 9, the condition is out of date\nwith respect to the current state of the instance.",
+                "format": "int64",
+                "minimum": 0,
+                "type": "integer"
+              },
+              "reason": {
+                "description": "reason contains a programmatic identifier indicating the reason for the condition's last transition.\nProducers of specific condition types may define expected values and meanings for this field,\nand whether the values are considered a guaranteed API.\nThe value should be a CamelCase string.\nThis field may not be empty.",
+                "maxLength": 1024,
+                "minLength": 1,
+                "pattern": "^[A-Za-z]([A-Za-z0-9_,:]*[A-Za-z0-9_])?$",
+                "type": "string"
+              },
+              "status": {
+                "description": "status of the condition, one of True, False, Unknown.",
+                "enum": [
+                  "True",
+                  "False",
+                  "Unknown"
+                ],
+                "type": "string"
+              },
+              "type": {
+                "description": "type of condition in CamelCase or in foo.example.com/CamelCase.",
+                "maxLength": 316,
+                "pattern": "^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$",
+                "type": "string"
+              }
+            },
+            "required": [
+              "lastTransitionTime",
+              "message",
+              "reason",
+              "status",
+              "type"
+            ],
+            "type": "object"
+          },
+          "type": "array",
+          "x-kubernetes-list-map-keys": [
+            "type"
+          ],
+          "x-kubernetes-list-type": "map"
+        },
+        "lastSyncTime": {
+          "description": "LastSyncTime is the last time the resource was synced with Zitadel.",
+          "format": "date-time",
+          "type": "string"
+        },
+        "organizationId": {
+          "description": "OrganizationId is the resolved organization ID (inherited from project).",
+          "type": "string"
+        },
+        "projectId": {
+          "description": "ProjectId is the resolved project ID this app belongs to.",
+          "type": "string"
+        },
+        "ready": {
+          "description": "Ready indicates whether the APIApp is successfully synced.",
+          "type": "boolean"
+        }
+      },
+      "type": "object"
+    }
+  },
+  "required": [
+    "apiVersion",
+    "kind",
+    "metadata"
+  ],
+  "title": "APIApp",
+  "type": "object"
+}

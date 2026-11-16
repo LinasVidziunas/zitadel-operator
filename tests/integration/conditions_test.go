@@ -28,11 +28,12 @@ func TestOIDCApp_RefNotReady_ThenResolves(t *testing.T) {
 	app := &zitadelv1alpha2.OIDCApp{
 		ObjectMeta: metav1.ObjectMeta{Name: appName, Namespace: "default"},
 		Spec: zitadelv1alpha2.OIDCAppSpec{
-			ProjectRef:   &zitadelv1alpha2.ResourceRef{Name: projName},
-			Type:         "confidential",
-			AuthMethod:   "basic",
-			RedirectUris: []string{"https://test.example.com/cb"},
-			SecretRef:    zitadelv1alpha2.SecretRefSpec{Name: secretName},
+			DeletionPolicy: "Delete",
+			ProjectRef:     &zitadelv1alpha2.ResourceRef{Name: projName},
+			Type:           "confidential",
+			AuthMethod:     "basic",
+			RedirectUris:   []string{"https://test.example.com/cb"},
+			SecretRef:      zitadelv1alpha2.SecretRefSpec{Name: secretName},
 		},
 	}
 	if err := k8sClient.Create(ctx, app); err != nil {
@@ -56,7 +57,7 @@ func TestOIDCApp_RefNotReady_ThenResolves(t *testing.T) {
 	// Now create the Project — the OIDCApp should eventually resolve.
 	proj := &zitadelv1alpha2.Project{
 		ObjectMeta: metav1.ObjectMeta{Name: projName, Namespace: "default"},
-		Spec:       zitadelv1alpha2.ProjectSpec{OrganizationId: testOrgID},
+		Spec:       zitadelv1alpha2.ProjectSpec{OrganizationId: testOrgID, DeletionPolicy: "Delete"},
 	}
 	if err := k8sClient.Create(ctx, proj); err != nil {
 		t.Fatalf("creating Project: %v", err)
@@ -100,7 +101,7 @@ func TestProject_ConditionsOnSuccess(t *testing.T) {
 
 	proj := &zitadelv1alpha2.Project{
 		ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: "default"},
-		Spec:       zitadelv1alpha2.ProjectSpec{OrganizationId: testOrgID},
+		Spec:       zitadelv1alpha2.ProjectSpec{OrganizationId: testOrgID, DeletionPolicy: "Delete"},
 	}
 	if err := k8sClient.Create(ctx, proj); err != nil {
 		t.Fatalf("creating Project: %v", err)
@@ -212,7 +213,7 @@ func TestOIDCApp_DeletedExternally(t *testing.T) {
 	// Create Project.
 	proj := &zitadelv1alpha2.Project{
 		ObjectMeta: metav1.ObjectMeta{Name: projName, Namespace: "default"},
-		Spec:       zitadelv1alpha2.ProjectSpec{OrganizationId: testOrgID},
+		Spec:       zitadelv1alpha2.ProjectSpec{OrganizationId: testOrgID, DeletionPolicy: "Delete"},
 	}
 	if err := k8sClient.Create(ctx, proj); err != nil {
 		t.Fatalf("creating Project: %v", err)
@@ -224,11 +225,12 @@ func TestOIDCApp_DeletedExternally(t *testing.T) {
 	app := &zitadelv1alpha2.OIDCApp{
 		ObjectMeta: metav1.ObjectMeta{Name: appName, Namespace: "default"},
 		Spec: zitadelv1alpha2.OIDCAppSpec{
-			ProjectRef:   &zitadelv1alpha2.ResourceRef{Name: projName},
-			Type:         "confidential",
-			AuthMethod:   "basic",
-			RedirectUris: []string{"https://extdel.example.com/cb"},
-			SecretRef:    zitadelv1alpha2.SecretRefSpec{Name: secretName},
+			DeletionPolicy: "Delete",
+			ProjectRef:     &zitadelv1alpha2.ResourceRef{Name: projName},
+			Type:           "confidential",
+			AuthMethod:     "basic",
+			RedirectUris:   []string{"https://extdel.example.com/cb"},
+			SecretRef:      zitadelv1alpha2.SecretRefSpec{Name: secretName},
 		},
 	}
 	if err := k8sClient.Create(ctx, app); err != nil {

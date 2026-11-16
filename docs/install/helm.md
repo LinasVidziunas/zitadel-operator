@@ -4,8 +4,8 @@ Two OCI charts are published to GHCR on every release:
 
 | Chart | Contents | Scope |
 | --- | --- | --- |
-| `oci://ghcr.io/truvity/charts/zitadel-operator-crds` | All 43 CRDs | Cluster-scoped — install **once** per cluster, shared by every operator deployment |
-| `oci://ghcr.io/truvity/charts/zitadel-operator` | Deployment, ServiceAccount, RBAC, ConfigMap | One release **per Zitadel instance** you manage |
+| `oci://ghcr.io/linasvidziunas/charts/zitadel-operator-crds` | All 44 CRDs | Cluster-scoped — install **once** per cluster, shared by every operator deployment |
+| `oci://ghcr.io/linasvidziunas/charts/zitadel-operator` | Deployment, ServiceAccount, RBAC, ConfigMap, optional bootstrap Job | One release **per Zitadel instance** you manage |
 
 ## Before you install: two decisions
 
@@ -28,18 +28,18 @@ The assertion is verified at startup against the credential's actual memberships
 ### 1. Install the CRDs
 
 ```bash
-helm install zitadel-operator-crds oci://ghcr.io/truvity/charts/zitadel-operator-crds
+helm install zitadel-operator-crds oci://ghcr.io/linasvidziunas/charts/zitadel-operator-crds
 ```
 
 CRDs are cluster-scoped: with multiple operator deployments, install this chart once and never per operator.
 
 ### 2. Provide the credential
 
-Create a Secret holding the JWT key JSON of the Zitadel service account (Zitadel Console → Service Users → Keys, or provisioned by IaC). In production this is typically synced by External Secrets Operator from a cloud secret store.
+Use the [bootstrap Job](fork.md#zero-click-bootstrap-for-an-existing-instance) to provision a normal machine credential automatically. For an existing credential, sync its JSON key through your secret store or create the Secret directly:
 
-```bash
-kubectl -n zitadel-operator create secret generic zitadel-admin-sa \
-  --from-file=zitadel-admin-sa.json=/path/to/key.json
+```nu
+kubectl create namespace zitadel-operator
+kubectl -n zitadel-operator create secret generic zitadel-admin-sa --from-file=zitadel-admin-sa.json=/path/to/key.json
 ```
 
 The key is mounted as a file (kubelet keeps it in sync on rotation); the operator never needs Secret-read RBAC for its own credential.
@@ -61,9 +61,8 @@ credentials:
   mountPath: /etc/zitadel
 ```
 
-```bash
-helm install zitadel-operator oci://ghcr.io/truvity/charts/zitadel-operator \
-  --namespace zitadel-operator --create-namespace -f values.yaml
+```nu
+helm install zitadel-operator oci://ghcr.io/linasvidziunas/charts/zitadel-operator --namespace zitadel-operator --create-namespace -f values.yaml
 ```
 
 The chart renders the operator config into a ConfigMap (see the [configuration reference](configuration.md) for every key) and mounts the credential Secret at `credentials.mountPath`.
